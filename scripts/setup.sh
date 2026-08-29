@@ -29,20 +29,20 @@ fi
 source .venv/bin/activate
 pip install -e . >/dev/null
 
+echo "==> Embedded voice engine (vendored Voicebox)"
+if [ ! -d vendor/voicebox/.git ]; then
+  echo "Cloning Voicebox source..."
+  git clone --depth 1 https://github.com/jamiepine/voicebox.git vendor/voicebox
+fi
+"$ROOT/scripts/setup-voicebox-engine.sh"
+
 echo "==> Frontend dependencies"
 cd "$ROOT/frontend"
 npm install >/dev/null
 
-echo "==> Checking Voicebox"
-if curl -sf http://127.0.0.1:17493/health >/dev/null; then
-  echo "Voicebox: OK"
-else
-  echo "Voicebox: NOT RUNNING"
-  echo "  Download and launch Voicebox from https://voicebox.sh/download/mac-arm"
-fi
-
 echo ""
 echo "Setup complete."
-echo "  Backend:  cd backend && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000"
-echo "  Frontend: cd frontend && npm run dev"
+echo "  Dev:      ./scripts/dev.sh"
 echo "  UI:       http://localhost:3000"
+echo ""
+echo "Ultron now bundles the Voicebox engine — you do NOT need the Voicebox desktop app."

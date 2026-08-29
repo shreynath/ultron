@@ -9,6 +9,8 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.config import settings
+from app.services.engines import normalize_engine
+from app.services.voice_delivery import VoiceDeliverySettings, deliver_speech
 from app.services.voicebox_client import VoiceboxClient, VoiceboxError
 
 router = APIRouter(prefix="/api/speak", tags=["speak"])
@@ -20,6 +22,9 @@ class SpeakRequest(BaseModel):
     profile_id: str
     language: str = "en"
     engine: str | None = None
+    voice_style: str = Field(default="ultron_cinematic", pattern="^(ultron_cinematic|natural)$")
+    speed: float = Field(default=0.86, ge=0.7, le=1.0)
+    bass_boost: float = Field(default=6.0, ge=0.0, le=12.0)
 
 
 class SpeakResponse(BaseModel):
@@ -27,14 +32,24 @@ class SpeakResponse(BaseModel):
     content_type: str = "audio/wav"
 
 
+def _delivery_from_request(body: SpeakRequest) -> VoiceDeliverySettings:
+    return VoiceDeliverySettings(
+        voice_style=body.voice_style,
+        speed=body.speed,
+        bass_boost=body.bass_boost,
+    )
+
+
 @router.post("")
 async def speak(body: SpeakRequest):
     try:
-        audio_bytes = await client.generate(
+        audio_bytes = await deliver_speech(
+            client,
             text=body.text,
             profile_id=body.profile_id,
             language=body.language,
-            engine=body.engine,
+            engine=normalize_engine(body.engine),
+            delivery=_delivery_from_request(body),
         )
     except VoiceboxError as exc:
         raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
@@ -52,11 +67,13 @@ async def speak(body: SpeakRequest):
 @router.post("/download")
 async def speak_download(body: SpeakRequest):
     try:
-        audio_bytes = await client.generate(
+        audio_bytes = await deliver_speech(
+            client,
             text=body.text,
             profile_id=body.profile_id,
             language=body.language,
-            engine=body.engine,
+            engine=normalize_engine(body.engine),
+            delivery=_delivery_from_request(body),
         )
     except VoiceboxError as exc:
         raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc

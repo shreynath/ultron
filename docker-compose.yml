@@ -1,0 +1,32 @@
+# Optional: run Voicebox as a headless server (Linux/servers).
+# On Apple Silicon Mac, prefer the native Voicebox app for MLX acceleration.
+#
+# Usage:
+#   git clone https://github.com/jamiepine/voicebox.git vendor/voicebox
+#   docker compose up voicebox
+#
+# Or point VOICEBOX_API_URL in .env to your running Voicebox instance.
+
+services:
+  voicebox:
+    image: voicebox-local
+    build:
+      context: ./vendor/voicebox
+    container_name: ultron-voicebox
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:17493:17493"
+    volumes:
+      - voicebox-data:/app/data
+      - huggingface-cache:/home/voicebox/.cache/huggingface
+    environment:
+      - LOG_LEVEL=info
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+
+volumes:
+  voicebox-data:
+  huggingface-cache:

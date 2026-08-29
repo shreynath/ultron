@@ -1,19 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { listVoices, refineTranscript, transcribeAudio, type VoiceProfile } from "@/lib/api";
+import { useRef, useState } from "react";
+import { refineTranscript, speakText, transcribeAudio } from "@/lib/api";
+import { VoiceProfilePicker } from "@/components/VoiceProfilePicker";
+import {
+  DEFAULT_VOICE_DELIVERY,
+  VoiceCharacterControls,
+  type VoiceDelivery,
+} from "@/components/VoiceCharacterControls";
 
 export function DictationMic() {
   const [recording, setRecording] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
   async function startRecording() {
     setError(null);
     setStatus(null);
+    setCopied(false);
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const recorder = new MediaRecorder(stream);
     chunksRef.current = [];
@@ -57,6 +65,13 @@ export function DictationMic() {
     }
   }
 
+  async function handleCopy() {
+    if (!transcript.trim()) return;
+    await navigator.clipboard.writeText(transcript);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <div className="card space-y-4">
       <div>
@@ -66,7 +81,7 @@ export function DictationMic() {
         </p>
       </div>
 
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         {!recording ? (
           <button className="btn-primary" type="button" onClick={startRecording}>
             Start Recording
@@ -84,6 +99,14 @@ export function DictationMic() {
         >
           Refine with Ollama
         </button>
+        <button
+          className="btn-secondary"
+          type="button"
+          onClick={handleCopy}
+          disabled={!transcript.trim()}
+        >
+          {copied ? "Copied!" : "Copy Transcript"}
+        </button>
       </div>
 
       {status && <p className="text-sm text-violet-300">{status}</p>}
@@ -100,35 +123,42 @@ export function DictationMic() {
 }
 
 export function TTSPlayer() {
-  const [profiles, setProfiles] = useState<VoiceProfile[]>([]);
   const [profileId, setProfileId] = useState("");
+  const [engine, setEngine] = useState("qwen");
   const [text, setText] = useState("Hello from Ultron. This is a cloned voice speaking new words.");
   const [audioSrc, setAudioSrc] = useState<string | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    listVoices()
-      .then((data) => {
-        setProfiles(data);
-        if (data[0]) setProfileId(data[0].id);
-      })
-      .catch(() => setError("Could not load voice profiles"));
-  }, []);
+  const [delivery, setDelivery] = useState<VoiceDelivery>(DEFAULT_VOICE_DELIVERY);
 
   async function handleSpeak() {
     if (!profileId || !text.trim()) return;
     setError(null);
     setStatus("Generating speech...");
     try {
-      const { speakText } = await import("@/lib/api");
-      const src = await speakText({ text, profile_id: profileId });
+      const src = await speakText({ text, profile_id: profileId, engine, ...delivery });
       setAudioSrc(src);
+      const base64 = src.split(",")[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      setAudioBlob(new Blob([bytes], { type: "audio/wav" }));
       setStatus("Ready");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Speech generation failed");
       setStatus(null);
     }
+  }
+
+  function handleDownload() {
+    if (!audioBlob) return;
+    const url = URL.createObjectURL(audioBlob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "ultron-speech.wav";
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -140,23 +170,15 @@ export function TTSPlayer() {
         </p>
       </div>
 
-      <div>
-        <label className="label" htmlFor="voice-select">
-          Voice profile
-        </label>
-        <select
-          id="voice-select"
-          className="input"
-          value={profileId}
-          onChange={(event) => setProfileId(event.target.value)}
-        >
-          {profiles.map((profile) => (
-            <option key={profile.id} value={profile.id}>
-              {profile.name}
-            </option>
-          ))}
-        </select>
-      </div>
+      <VoiceProfilePicker
+        value={profileId}
+        onChange={setProfileId}
+        engine={engine}
+        onEngineChange={setEngine}
+        showEngine
+      />
+
+      <VoiceCharacterControls value={delivery} onChange={setDelivery} id="tts-voice-character" />
 
       <textarea
         className="input min-h-32"
@@ -164,9 +186,14 @@ export function TTSPlayer() {
         onChange={(event) => setText(event.target.value)}
       />
 
-      <button className="btn-primary" type="button" onClick={handleSpeak} disabled={!profileId}>
-        Generate Speech
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button className="btn-primary" type="button" onClick={handleSpeak} disabled={!profileId}>
+          Generate Speech
+        </button>
+        <button className="btn-secondary" type="button" onClick={handleDownload} disabled={!audioBlob}>
+          Download WAV
+        </button>
+      </div>
 
       {status && <p className="text-sm text-violet-300">{status}</p>}
       {error && <p className="text-sm text-red-400">{error}</p>}

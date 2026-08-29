@@ -10,21 +10,32 @@ class OllamaError(Exception):
 
 
 async def refine_transcript(text: str) -> str:
+    return await chat_response(
+        system_prompt=(
+            "Clean up this dictated transcript. Remove filler words, false starts, "
+            "and stutters. Preserve meaning and technical terms. Return only the cleaned text."
+        ),
+        user_message=text,
+    )
+
+
+async def chat_response(
+    *,
+    user_message: str,
+    system_prompt: str = "You are a helpful assistant. Keep replies concise and conversational.",
+    history: list[dict[str, str]] | None = None,
+) -> str:
     if not settings.ollama_api_key:
         raise OllamaError("OLLAMA_API_KEY is not configured")
 
+    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": user_message})
+
     payload = {
         "model": settings.ollama_model,
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "Clean up this dictated transcript. Remove filler words, false starts, "
-                    "and stutters. Preserve meaning and technical terms. Return only the cleaned text."
-                ),
-            },
-            {"role": "user", "content": text},
-        ],
+        "messages": messages,
         "stream": False,
     }
 
@@ -38,4 +49,4 @@ async def refine_transcript(text: str) -> str:
             raise OllamaError(response.text)
         data = response.json()
         message = data.get("message", {})
-        return message.get("content", "").strip() or text
+        return message.get("content", "").strip() or user_message

@@ -19,7 +19,9 @@ out/
 dist/
 *.tsbuildinfo
 
-# Data & media cache
+vendor/voicebox/backend/venv/
+vendor/voicebox/backend/data/
+vendor/voicebox/**/__pycache__/
 data/
 backend/data/
 *.wav

@@ -1,13 +1,14 @@
 # Ultron Voice
 
-Phase 1 of Ultron: a custom voice studio for **dictation** and **zero-shot voice cloning**, powered by the free [Voicebox](https://voicebox.sh) engine running locally on your Mac.
+Phase 1 of Ultron: a custom voice studio for **dictation** and **zero-shot voice cloning**, with the open-source [Voicebox](https://github.com/jamiepine/voicebox) engine **embedded directly** — no separate desktop app required.
 
 ## What it does
 
 - Clone any voice from a YouTube URL, MP3, MP4, or WAV
 - Extract the best speech clips automatically from long source audio
-- Dictate with your microphone (Whisper via Voicebox)
-- Generate speech in cloned voices for arbitrary new text
+- Dictate with your microphone (Whisper via embedded engine)
+- Generate speech in cloned voices with cinematic delivery controls (depth, reverb, pace)
+- Talk mode: chat with Ollama and hear replies in your cloned voice
 - Optionally refine transcripts with Ollama Cloud
 
 ## Architecture
@@ -17,17 +18,20 @@ Ultron Web UI (Next.js :3000)
         ↓
 Ultron API (FastAPI :8000)
         ↓
-Voicebox native app (:17493) — MLX on Apple Silicon
+Embedded Voicebox engine (vendor/voicebox, MLX on Apple Silicon :17493)
 ```
+
+See [docs/VOICE_ENGINE.md](docs/VOICE_ENGINE.md) for engine modes and customization.
 
 ## Prerequisites
 
-1. **Voicebox** (macOS Apple Silicon): https://voicebox.sh/download/mac-arm
+1. **Apple Silicon Mac** recommended (MLX acceleration for Qwen3-TTS + Whisper)
 2. **Homebrew tools**:
    ```bash
    brew install ffmpeg yt-dlp
    ```
-3. **Python 3.11+** and **Node.js 20+**
+3. **Python 3.12+** and **Node.js 20+**
+4. **~5GB disk** for voice models (downloaded on first use)
 
 ## Setup
 
@@ -37,6 +41,12 @@ cp .env.example .env
 # Edit .env and add your OLLAMA_API_KEY (optional)
 
 ./scripts/setup.sh
+```
+
+### Run everything
+
+```bash
+./scripts/dev.sh
 ```
 
 ### Run backend
@@ -58,6 +68,13 @@ npm run dev
 ```
 
 Open http://localhost:3000
+
+## Verify & test
+
+```bash
+./scripts/verify-voicebox.sh    # Check Voicebox is running
+./scripts/integration-test.sh   # Run full test suite
+```
 
 ## Usage
 

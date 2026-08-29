@@ -32,7 +32,12 @@ export default async function DashboardPage() {
         <StatusCard
           title="Voicebox"
           ok={health?.voicebox.ok ?? false}
-          detail={health?.voicebox.ok ? "Connected" : "Start the Voicebox macOS app"}
+          detail={
+            health?.voicebox.ok
+              ? "Connected"
+              : "Not running — download and launch Voicebox"
+          }
+          link={health?.voicebox.ok ? undefined : "https://voicebox.sh/download/mac-arm"}
         />
         <StatusCard
           title="Media Tools"
@@ -57,10 +62,12 @@ function StatusCard({
   title,
   ok,
   detail,
+  link,
 }: {
   title: string;
   ok: boolean;
   detail: string;
+  link?: string;
 }) {
   return (
     <div className="card">
@@ -71,6 +78,11 @@ function StatusCard({
         </span>
       </div>
       <p className="mt-2 text-sm text-zinc-400">{detail}</p>
+      {link && !ok && (
+        <a className="mt-2 inline-block text-sm text-violet-400 underline hover:text-violet-300" href={link}>
+          Download Voicebox
+        </a>
+      )}
     </div>
   );
 }

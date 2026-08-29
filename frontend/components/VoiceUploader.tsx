@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cloneFromFile, cloneFromUrl } from "@/lib/api";
+import { ENGINE_OPTIONS } from "@/components/VoiceProfilePicker";
 
 type Step = "idle" | "downloading" | "extracting" | "transcribing" | "creating" | "done" | "error";
 
@@ -11,6 +12,7 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [engine, setEngine] = useState("qwen");
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
@@ -31,18 +33,24 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
 
     try {
       setStep("downloading");
-      await new Promise((resolve) => setTimeout(resolve, 300));
       setStep("extracting");
-      await new Promise((resolve) => setTimeout(resolve, 300));
       setStep("transcribing");
 
-      const response = file
-        ? await cloneFromFile({ file, name: name.trim() })
-        : await cloneFromUrl({ url: url.trim(), name: name.trim() });
+      const response = url.trim()
+        ? await cloneFromUrl({ url: url.trim(), name: name.trim(), engine })
+        : file
+          ? await cloneFromFile({ file, name: name.trim(), engine })
+          : (() => {
+              throw new Error("Provide a YouTube URL or upload an audio/video file");
+            })();
 
       setStep("creating");
       setStep("done");
-      setResult(`Created voice "${response.name}" with ${response.samples_added} sample(s).`);
+      setResult(
+        `Created voice "${response.name}" with ${response.samples_added} sample(s) using ${response.engine}.${
+          response.quality_warning ? ` Note: ${response.quality_warning}` : ""
+        }`
+      );
       setName("");
       setUrl("");
       setFile(null);
@@ -58,8 +66,10 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
       <div>
         <h2 className="text-xl font-semibold">Clone a Voice</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Paste a YouTube URL or upload MP3/MP4/WAV. Ultron extracts clean speech clips and
-          creates a zero-shot voice profile.
+          Paste a YouTube URL or upload MP3/MP4/WAV. For best similarity, use a source where
+          <strong className="text-zinc-200"> only one person speaks alone</strong> for at least
+          1–2 minutes — interviews, podcasts, or monologues work best. Movie dialogue with multiple
+          characters will sound wrong.
         </p>
       </div>
 
@@ -77,6 +87,24 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
       </div>
 
       <div>
+        <label className="label" htmlFor="voice-engine">
+          Cloning engine
+        </label>
+        <select
+          id="voice-engine"
+          className="input"
+          value={engine}
+          onChange={(event) => setEngine(event.target.value)}
+        >
+          {ENGINE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
         <label className="label" htmlFor="voice-url">
           YouTube or media URL
         </label>
@@ -85,7 +113,10 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
           className="input"
           placeholder="https://youtube.com/watch?v=..."
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => {
+            setUrl(event.target.value);
+            if (event.target.value.trim()) setFile(null);
+          }}
         />
       </div>
 
@@ -98,7 +129,10 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
           type="file"
           accept="audio/*,video/*,.mp3,.mp4,.wav,.m4a"
           className="block w-full text-sm text-zinc-300 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:text-zinc-100"
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          onChange={(event) => {
+            setFile(event.target.files?.[0] ?? null);
+            if (event.target.files?.[0]) setUrl("");
+          }}
         />
       </div>
 
@@ -124,7 +158,11 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
       {error && <p className="text-sm text-red-400">{error}</p>}
       {result && <p className="text-sm text-emerald-400">{result}</p>}
 
-      <button className="btn-primary" type="submit" disabled={step !== "idle" && step !== "done" && step !== "error"}>
+      <button
+        className="btn-primary"
+        type="submit"
+        disabled={step !== "idle" && step !== "done" && step !== "error"}
+      >
         Clone Voice
       </button>
     </form>

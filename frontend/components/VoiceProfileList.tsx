@@ -61,7 +61,15 @@ export function VoiceProfileList({ refreshKey }: { refreshKey?: number }) {
               <p className="font-medium">{profile.name}</p>
               <p className="text-xs text-zinc-500">
                 {profile.engine || "cloned"} · {profile.language || "en"}
+                {typeof profile.sample_count === "number" && (
+                  <> · {profile.sample_count} sample{profile.sample_count === 1 ? "" : "s"}</>
+                )}
               </p>
+              {profile.sample_count === 0 && (
+                <p className="mt-1 text-xs text-amber-400">
+                  No samples — delete and re-clone this voice
+                </p>
+              )}
             </div>
             <button
               className="btn-secondary text-red-300"

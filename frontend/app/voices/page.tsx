@@ -3,12 +3,14 @@
 import { useState } from "react";
 import { VoiceProfileList } from "@/components/VoiceProfileList";
 import { VoiceUploader } from "@/components/VoiceUploader";
+import { VoiceboxBanner } from "@/components/VoiceboxBanner";
 
 export default function VoicesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
     <div className="space-y-8">
+      <VoiceboxBanner />
       <section>
         <h2 className="text-3xl font-semibold">Voice Profiles</h2>
         <p className="mt-2 text-zinc-400">
