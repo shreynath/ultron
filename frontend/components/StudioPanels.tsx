@@ -131,11 +131,15 @@ export function TTSPlayer() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [delivery, setDelivery] = useState<VoiceDelivery>(DEFAULT_VOICE_DELIVERY);
+  const [generating, setGenerating] = useState(false);
+  const generatingRef = useRef(false);
 
   async function handleSpeak() {
-    if (!profileId || !text.trim()) return;
+    if (!profileId || !text.trim() || generatingRef.current) return;
+    generatingRef.current = true;
+    setGenerating(true);
     setError(null);
-    setStatus("Generating speech...");
+    setStatus("Shaping speech in theater mode...");
     try {
       const src = await speakText({ text, profile_id: profileId, engine, ...delivery });
       setAudioSrc(src);
@@ -148,6 +152,9 @@ export function TTSPlayer() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Speech generation failed");
       setStatus(null);
+    } finally {
+      generatingRef.current = false;
+      setGenerating(false);
     }
   }
 
@@ -187,10 +194,15 @@ export function TTSPlayer() {
       />
 
       <div className="flex flex-wrap gap-3">
-        <button className="btn-primary" type="button" onClick={handleSpeak} disabled={!profileId}>
-          Generate Speech
+        <button
+          className="btn-primary"
+          type="button"
+          onClick={handleSpeak}
+          disabled={!profileId || generating}
+        >
+          {generating ? "Generating..." : "Generate Speech"}
         </button>
-        <button className="btn-secondary" type="button" onClick={handleDownload} disabled={!audioBlob}>
+        <button className="btn-secondary" type="button" onClick={handleDownload} disabled={!audioBlob || generating}>
           Download WAV
         </button>
       </div>

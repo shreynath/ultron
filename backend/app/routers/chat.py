@@ -22,9 +22,9 @@ class ChatRequest(BaseModel):
     profile_id: str
     engine: str | None = "qwen"
     system_prompt: str = "You are a helpful assistant. Keep replies concise and conversational, 1-3 sentences."
-    voice_style: str = Field(default="ultron_cinematic", pattern="^(ultron_cinematic|natural)$")
-    speed: float = Field(default=0.86, ge=0.7, le=1.0)
-    bass_boost: float = Field(default=6.0, ge=0.0, le=12.0)
+    voice_style: str = Field(default="theater_auto", pattern="^(theater_auto|ultron_cinematic|reference|natural)$")
+    speed: float = Field(default=0.84, ge=0.7, le=1.0)
+    bass_boost: float = Field(default=5.0, ge=0.0, le=12.0)
 
 
 class ChatResponse(BaseModel):
@@ -54,6 +54,7 @@ async def chat_and_speak(body: ChatRequest):
             profile_id=body.profile_id,
             engine=body.engine,
             delivery=_delivery_from_request(body),
+            data_dir=settings.data_dir,
         )
     except OllamaError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -74,9 +75,7 @@ async def voice_chat(
     file: UploadFile = File(...),
     profile_id: str = Form(...),
     engine: str = Form("qwen"),
-    voice_style: str = Form("ultron_cinematic"),
-    speed: float = Form(0.86),
-    bass_boost: float = Form(6.0),
+    voice_style: str = Form("theater_auto"),
 ):
     work_dir = Path(settings.data_dir) / "chat" / str(uuid.uuid4())
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -95,8 +94,7 @@ async def voice_chat(
 
     delivery = VoiceDeliverySettings(
         voice_style=voice_style,
-        speed=speed,
-        bass_boost=bass_boost,
+        profile_id=profile_id,
     )
 
     try:
@@ -111,6 +109,7 @@ async def voice_chat(
             profile_id=profile_id,
             engine=engine,
             delivery=delivery,
+            data_dir=settings.data_dir,
         )
     except OllamaError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

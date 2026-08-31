@@ -13,6 +13,8 @@ from app.services.engines import normalize_engine
 from app.services.voice_engine.direct import direct_generate, direct_transcribe, init_direct_engine
 from app.services.voice_engine.manager import get_engine_manager
 
+_tts_generation_lock = asyncio.Lock()
+
 
 class VoiceboxError(Exception):
     def __init__(self, message: str, status_code: int | None = None):
@@ -207,12 +209,35 @@ class VoiceboxClient:
         engine: str | None = None,
         instruct: str | None = None,
         effects_chain: list[dict[str, Any]] | None = None,
+        normalize: bool = True,
+    ) -> bytes:
+        async with _tts_generation_lock:
+            return await self._generate_locked(
+                text=text,
+                profile_id=profile_id,
+                language=language,
+                engine=engine,
+                instruct=instruct,
+                effects_chain=effects_chain,
+                normalize=normalize,
+            )
+
+    async def _generate_locked(
+        self,
+        text: str,
+        profile_id: str,
+        language: str = "en",
+        engine: str | None = None,
+        instruct: str | None = None,
+        effects_chain: list[dict[str, Any]] | None = None,
+        normalize: bool = True,
     ) -> bytes:
         payload: dict[str, Any] = {
             "text": text,
             "profile_id": profile_id,
             "language": language,
             "model_size": "1.7B",
+            "normalize": normalize,
         }
         normalized = normalize_engine(engine)
         if normalized:
@@ -230,6 +255,7 @@ class VoiceboxClient:
                 engine=normalized,
                 instruct=instruct,
                 effects_chain=effects_chain,
+                normalize=normalize,
             )
 
         await self._ensure_engine()

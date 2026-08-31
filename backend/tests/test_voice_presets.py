@@ -15,6 +15,14 @@ def test_resolve_voice_delivery_cinematic():
     assert effects
 
 
+def test_resolve_voice_delivery_reference():
+    instruct, effects = resolve_voice_delivery("reference")
+    assert instruct
+    assert effects
+    assert effects[0]["type"] == "pitch_shift"
+    assert effects[0]["params"]["semitones"] == -1.5
+
+
 def test_resolve_voice_delivery_natural():
     instruct, effects = resolve_voice_delivery("natural")
     assert instruct is None

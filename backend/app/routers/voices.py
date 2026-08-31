@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import uuid
 from pathlib import Path
 
@@ -9,7 +10,12 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.services.clip_extractor import extract_best_clips
 from app.services.media_ingest import ensure_ffmpeg, ensure_yt_dlp, ingest_media
-from app.services.voice_presets import ultron_cinematic_effects_chain
+from app.services.reference_extractor import (
+    LONG_SOURCE_SECONDS,
+    extract_reference_clips,
+    save_profile_delivery,
+)
+from app.services.voice_presets import reference_match_effects_chain, ultron_cinematic_effects_chain
 from app.services.voicebox_client import VoiceboxClient, VoiceboxError
 
 router = APIRouter(prefix="/api/voices", tags=["voices"])
@@ -21,6 +27,7 @@ class CloneFromUrlRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     engine: str = "qwen"
     language: str = "en"
+    reference_mode: bool = True
 
 
 class CloneResponse(BaseModel):
@@ -29,6 +36,25 @@ class CloneResponse(BaseModel):
     samples_added: int
     engine: str
     quality_warning: str | None = None
+    delivery: dict | None = None
+
+
+def _probe_duration(wav_path: Path) -> float:
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        str(wav_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        return float(result.stdout.strip())
+    except ValueError:
+        return 0.0
 
 
 @router.get("")
@@ -39,10 +65,7 @@ async def list_voices():
     except Exception as exc:
         message = str(exc)
         if "connection attempts failed" in message.lower():
-            message = (
-                "Voicebox is not running. Install from https://voicebox.sh/download/mac-arm "
-                "and launch the app."
-            )
+            message = "Voice engine is not running. Run ./scripts/dev.sh"
         raise HTTPException(status_code=502, detail=message) from exc
 
 
@@ -57,6 +80,7 @@ async def clone_from_url(body: CloneFromUrlRequest):
             engine=body.engine,
             language=body.language,
             work_dir=work_dir,
+            reference_mode=body.reference_mode,
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -67,6 +91,7 @@ async def clone_from_upload(
     name: str = Form(...),
     engine: str = Form("qwen"),
     language: str = Form("en"),
+    reference_mode: bool = Form(True),
     file: UploadFile = File(...),
 ):
     work_dir = Path(settings.data_dir) / "ingest" / str(uuid.uuid4())
@@ -83,6 +108,7 @@ async def clone_from_upload(
             engine=engine,
             language=language,
             work_dir=work_dir,
+            reference_mode=reference_mode,
         )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -97,20 +123,6 @@ async def delete_voice(profile_id: str):
         raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
 
 
-def _looks_like_multi_speaker(transcript: str) -> bool:
-    lowered = transcript.lower()
-    dialogue_markers = [
-        " i am ",
-        " you are ",
-        " he said",
-        " she said",
-        "hello,",
-        "?",
-    ]
-    hits = sum(1 for marker in dialogue_markers if marker in lowered)
-    return hits >= 3 or ("?" in transcript and len(transcript.split()) > 35)
-
-
 async def _create_profile_from_audio(
     *,
     audio_path: Path,
@@ -118,29 +130,46 @@ async def _create_profile_from_audio(
     engine: str,
     language: str,
     work_dir: Path,
+    reference_mode: bool = True,
 ) -> CloneResponse:
     clips_dir = work_dir / "clips"
-    clips = extract_best_clips(audio_path, clips_dir)
-
+    duration = _probe_duration(audio_path)
+    use_reference = reference_mode and duration >= LONG_SOURCE_SECONDS
+    delivery_settings: dict | None = None
+    quality_warnings: list[str] = []
     prepared_samples: list[tuple[Path, str]] = []
     errors: list[str] = []
-    quality_warnings: list[str] = []
-    for clip in clips:
+
+    if use_reference:
         try:
-            transcript = await client.transcribe(clip.path)
-            if transcript.strip():
-                if _looks_like_multi_speaker(transcript):
-                    quality_warnings.append(
-                        "One clip sounds like multiple speakers or dialogue. "
-                        "For best results, use a source where only the target person talks alone."
-                    )
-                prepared_samples.append((clip.path, transcript.strip()))
-        except VoiceboxError as exc:
-            errors.append(str(exc))
+            result = await extract_reference_clips(
+                audio_path,
+                clips_dir,
+                client.transcribe,
+            )
+            delivery_settings = result.delivery
+            quality_warnings.append(
+                f"Reference mode: kept {len(result.samples)} solo-speech clips "
+                f"(rejected {result.rejected_count} segments with other voices)."
+            )
+            prepared_samples = list(result.samples)
+        except ValueError as exc:
+            quality_warnings.append(str(exc))
+            use_reference = False
+
+    if not prepared_samples:
+        clips = extract_best_clips(audio_path, clips_dir, target_count=6 if duration > 120 else 4)
+        for clip in clips:
+            try:
+                transcript = await client.transcribe(clip.path)
+                if transcript.strip():
+                    prepared_samples.append((clip.path, transcript.strip()))
+            except VoiceboxError as exc:
+                errors.append(str(exc))
 
     if len(prepared_samples) < 2:
         quality_warnings.append(
-            "Only found one strong speech clip. Cloning works best with 3-4 clear solo-speech samples."
+            "Only found limited speech clips. Long Ultron monologue sections work best."
         )
 
     if not prepared_samples:
@@ -154,7 +183,7 @@ async def _create_profile_from_audio(
         profile = await client.create_profile(
             name=name,
             language=language,
-            description="Created by Ultron voice ingestion pipeline",
+            description="Ultron reference clone" if use_reference else "Created by Ultron voice ingestion pipeline",
         )
         profile_id = profile.get("id") or profile.get("profile_id")
         if not profile_id:
@@ -167,13 +196,21 @@ async def _create_profile_from_audio(
         if not saved_samples:
             raise HTTPException(
                 status_code=502,
-                detail="Voice samples failed to save in Voicebox. Make sure Voicebox is running and try again.",
+                detail="Voice samples failed to save. Make sure the voice engine is running.",
             )
 
+        effects = reference_match_effects_chain() if use_reference else ultron_cinematic_effects_chain()
         try:
-            await client.update_profile_effects(profile_id, ultron_cinematic_effects_chain())
+            await client.update_profile_effects(profile_id, effects)
         except VoiceboxError:
             pass
+
+        if use_reference and delivery_settings and profile_id:
+            save_profile_delivery(Path(settings.data_dir), profile_id, delivery_settings)
+
+        from app.services.film_identity import save_profile_gold_clips
+
+        save_profile_gold_clips(Path(settings.data_dir), profile_id, prepared_samples)
 
         return CloneResponse(
             profile_id=profile_id,
@@ -181,6 +218,7 @@ async def _create_profile_from_audio(
             samples_added=len(saved_samples),
             engine=engine,
             quality_warning=quality_warnings[0] if quality_warnings else None,
+            delivery=delivery_settings,
         )
     except Exception:
         if profile_id:

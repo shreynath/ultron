@@ -36,3 +36,12 @@ def test_process_speech_wav_slows_audio(sample_wav: bytes):
 
 def test_process_speech_wav_noop(sample_wav: bytes):
     assert process_speech_wav(sample_wav, speed=1.0, bass_gain_db=0.0) == sample_wav
+
+
+def test_process_speech_wav_pitch_keeps_approx_duration(sample_wav: bytes):
+    from app.services.audio_postprocess import wav_duration_ms
+
+    shifted = process_speech_wav(sample_wav, speed=1.0, bass_gain_db=0.0, pitch_semitones=1.2)
+    original_ms = wav_duration_ms(sample_wav)
+    shifted_ms = wav_duration_ms(shifted)
+    assert abs(shifted_ms - original_ms) / original_ms < 0.08

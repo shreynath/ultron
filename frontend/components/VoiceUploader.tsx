@@ -47,9 +47,13 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
       setStep("creating");
       setStep("done");
       setResult(
-        `Created voice "${response.name}" with ${response.samples_added} sample(s) using ${response.engine}.${
-          response.quality_warning ? ` Note: ${response.quality_warning}` : ""
-        }`
+        `Created voice "${response.name}" with ${response.samples_added} sample(s).${
+          response.delivery
+            ? ` Tuned pace to ${Math.round(response.delivery.speed * 100)}%, bass ${response.delivery.bass_boost} dB.`
+            : ""
+        }${
+          response.quality_warning ? ` ${response.quality_warning}` : ""
+        } Use "Reference match" style in Studio.`
       );
       setName("");
       setUrl("");
@@ -66,10 +70,9 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
       <div>
         <h2 className="text-xl font-semibold">Clone a Voice</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Paste a YouTube URL or upload MP3/MP4/WAV. For best similarity, use a source where
-          <strong className="text-zinc-200"> only one person speaks alone</strong> for at least
-          1–2 minutes — interviews, podcasts, or monologues work best. Movie dialogue with multiple
-          characters will sound wrong.
+          Paste a long YouTube clip (e.g. 10 min Ultron scenes). Ultron automatically finds solo
+          monologue segments, rejects other characters, and tunes pace and depth to match the
+          reference.
         </p>
       </div>
 

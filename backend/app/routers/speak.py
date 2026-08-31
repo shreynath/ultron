@@ -22,9 +22,9 @@ class SpeakRequest(BaseModel):
     profile_id: str
     language: str = "en"
     engine: str | None = None
-    voice_style: str = Field(default="ultron_cinematic", pattern="^(ultron_cinematic|natural)$")
-    speed: float = Field(default=0.86, ge=0.7, le=1.0)
-    bass_boost: float = Field(default=6.0, ge=0.0, le=12.0)
+    voice_style: str = Field(default="theater_auto", pattern="^(theater_auto|ultron_cinematic|reference|natural)$")
+    speed: float = Field(default=0.84, ge=0.7, le=1.0)
+    bass_boost: float = Field(default=5.0, ge=0.0, le=12.0)
 
 
 class SpeakResponse(BaseModel):
@@ -50,6 +50,7 @@ async def speak(body: SpeakRequest):
             language=body.language,
             engine=normalize_engine(body.engine),
             delivery=_delivery_from_request(body),
+            data_dir=settings.data_dir,
         )
     except VoiceboxError as exc:
         raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
@@ -74,6 +75,7 @@ async def speak_download(body: SpeakRequest):
             language=body.language,
             engine=normalize_engine(body.engine),
             delivery=_delivery_from_request(body),
+            data_dir=settings.data_dir,
         )
     except VoiceboxError as exc:
         raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc

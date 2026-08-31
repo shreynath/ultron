@@ -33,9 +33,12 @@ def _extract_segment(
     output_path: Path,
     *,
     normalize: bool = True,
+    highpass_hz: float = 80.0,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    filters = ["highpass=f=80"]
+    filters: list[str] = []
+    if highpass_hz and highpass_hz > 20:
+        filters.append(f"highpass=f={highpass_hz:.0f}")
     if normalize:
         filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
     cmd = [
@@ -51,12 +54,13 @@ def _extract_segment(
         "1",
         "-ar",
         str(SAMPLE_RATE),
-        "-af",
-        ",".join(filters),
         "-c:a",
         "pcm_s16le",
         str(output_path),
     ]
+    if filters:
+        cmd.insert(-3, "-af")
+        cmd.insert(-3, ",".join(filters))
     subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 

@@ -1,9 +1,7 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export type VoiceDelivery = {
-  voice_style: "ultron_cinematic" | "natural";
-  speed: number;
-  bass_boost: number;
+  voice_style: "theater_auto" | "ultron_cinematic" | "reference" | "natural";
 };
 
 export type HealthResponse = {
@@ -70,11 +68,12 @@ export async function cloneFromUrl(input: {
   name: string;
   engine?: string;
   language?: string;
+  reference_mode?: boolean;
 }) {
   const response = await fetch(`${API_URL}/api/voices/clone`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ reference_mode: true, ...input }),
   });
   if (!response.ok) await parseError(response, "Clone failed");
   return response.json();
@@ -131,8 +130,6 @@ export async function speakText(input: {
   language?: string;
   engine?: string;
   voice_style?: VoiceDelivery["voice_style"];
-  speed?: number;
-  bass_boost?: number;
 }) {
   const response = await fetch(`${API_URL}/api/speak`, {
     method: "POST",
@@ -140,9 +137,7 @@ export async function speakText(input: {
     body: JSON.stringify({
       ...input,
       engine: input.engine || "qwen",
-      voice_style: input.voice_style || "ultron_cinematic",
-      speed: input.speed ?? 0.86,
-      bass_boost: input.bass_boost ?? 6,
+      voice_style: input.voice_style || "theater_auto",
     }),
   });
   if (!response.ok) await parseError(response, "Speech generation failed");
@@ -170,9 +165,7 @@ export async function chatWithVoice(input: {
     body: JSON.stringify({
       ...input,
       engine: input.engine || "qwen",
-      voice_style: input.voice_style || "ultron_cinematic",
-      speed: input.speed ?? 0.86,
-      bass_boost: input.bass_boost ?? 6,
+      voice_style: input.voice_style || "theater_auto",
     }),
   });
   if (!response.ok) await parseError(response, "Chat failed");
@@ -195,9 +188,7 @@ export async function voiceChat(input: {
   form.append("file", input.audio, "recording.webm");
   form.append("profile_id", input.profile_id);
   form.append("engine", input.engine || "qwen");
-  form.append("voice_style", input.voice_style || "ultron_cinematic");
-  form.append("speed", String(input.speed ?? 0.86));
-  form.append("bass_boost", String(input.bass_boost ?? 6));
+  form.append("voice_style", input.voice_style || "theater_auto");
 
   const response = await fetch(`${API_URL}/api/chat/voice`, { method: "POST", body: form });
   if (!response.ok) await parseError(response, "Voice chat failed");
