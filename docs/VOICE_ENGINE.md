@@ -33,6 +33,10 @@ Override with `ULTRON_VOICEBOX_DATA_DIR`. Voice profiles and downloaded models p
 Patches in `vendor/voicebox/` (documented here, not upstream):
 
 - **MLX instruct forwarding** — passes delivery/emotion `instruct` to mlx-audio when supported
+- **Qwen ICL reference selection** — Qwen Base uses one clean, self-contained
+  profile sample rather than concatenating every uploaded clip into one
+  conditioning prompt. This avoids blending other speakers and scene audio into
+  the clone. Other Voicebox engines retain their native multi-sample behavior.
 - **Cinematic preset** — `backend/app/services/voice_presets.py` applies pitch, reverb, chorus, compression
 - **Post-processing** — speed + bass boost via ffmpeg in `audio_postprocess.py`
 

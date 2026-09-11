@@ -73,24 +73,27 @@ export function DictationMic() {
   }
 
   return (
-    <div className="card space-y-4">
+    <div className="card studio-card space-y-5 liquid-target">
       <div>
         <h2 className="text-xl font-semibold">Dictation</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
           Record speech and transcribe it with Voicebox Whisper.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div>
         {!recording ? (
-          <button className="btn-primary" type="button" onClick={startRecording}>
-            Start Recording
+          <button className="record-button" type="button" onClick={startRecording} aria-label="Start Recording">
+            ●
           </button>
         ) : (
-          <button className="btn-secondary" type="button" onClick={stopRecording}>
-            Stop Recording
+          <button className="record-button is-recording" type="button" onClick={stopRecording} aria-label="Stop Recording">
+            ■
           </button>
         )}
+        <p className="text-center text-sm text-[color:var(--text-secondary)]">{recording ? "Stop Recording" : "Start Recording"}</p>
+      </div>
+      <div className="flex flex-wrap gap-3">
         <button
           className="btn-secondary"
           type="button"
@@ -109,8 +112,8 @@ export function DictationMic() {
         </button>
       </div>
 
-      {status && <p className="text-sm text-violet-300">{status}</p>}
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {status && <p className="scan-progress">{status}</p>}
+      {error && <p className="error-copy">⚠ {error}</p>}
 
       <textarea
         className="input min-h-40"
@@ -169,10 +172,10 @@ export function TTSPlayer() {
   }
 
   return (
-    <div className="card space-y-4">
+    <div className="card studio-card space-y-4 liquid-target">
       <div>
         <h2 className="text-xl font-semibold">Text to Speech</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
           Type any text and speak it in your cloned voice.
         </p>
       </div>
@@ -192,6 +195,7 @@ export function TTSPlayer() {
         value={text}
         onChange={(event) => setText(event.target.value)}
       />
+      <p className="character-count">{text.length.toLocaleString()} characters</p>
 
       <div className="flex flex-wrap gap-3">
         <button
@@ -207,9 +211,9 @@ export function TTSPlayer() {
         </button>
       </div>
 
-      {status && <p className="text-sm text-violet-300">{status}</p>}
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      {audioSrc && <audio className="w-full" controls src={audioSrc} />}
+      {status && <p className="scan-progress">{status}</p>}
+      {error && <p className="error-copy">⚠ {error}</p>}
+      {audioSrc && <audio className="audio-player" controls src={audioSrc} />}
     </div>
   );
 }

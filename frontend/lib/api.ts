@@ -145,25 +145,85 @@ export async function speakText(input: {
   return `data:audio/wav;base64,${data.audio_base64}` as string;
 }
 
+export type TaskAssessment = {
+  task_type: string;
+  complexity: string;
+  requires_tools: boolean;
+  requires_memory: boolean;
+  requires_planning: boolean;
+  requires_verification: boolean;
+  direct_response_allowed: boolean;
+  reasoning_budget: string;
+  urgency: string;
+  user_goal: string;
+  rationale: string;
+  used_fallback: boolean;
+};
+
+export type CognitiveExecution = {
+  answer: string;
+  route: "direct_response" | "cognitive_execution_required";
+  status: "completed" | "requires_future_capability" | "failed";
+  assessment: TaskAssessment;
+  required_capabilities: string[];
+  plan?: {
+    plan_id: string;
+    status: "planned" | "not_required" | "failed";
+    failure_category?: string | null;
+  } | null;
+  capability_name?: string | null;
+  capability_operation?: string | null;
+  action_status?: string | null;
+  observation_outcome?: string | null;
+  response_generation_status?: "generated" | "fallback" | null;
+  verification?: {
+    status: "verified" | "partially_verified" | "unverified" | "contradicted" | "failed" | "not_required";
+    claims: { text: string; importance: string }[];
+    supporting_evidence: unknown[];
+    contradicting_evidence: unknown[];
+    latency_ms: number;
+  } | null;
+};
+
+export type CognitiveResult = CognitiveExecution;
+
+export type BrainStatus = {
+  status: string;
+  brain_model: string;
+  brain_model_base_url?: string;
+};
+
+export type CognitiveMetadata = {
+  task_type: string;
+  route: "direct_response" | "cognitive_execution_required";
+  status: "completed" | "requires_future_capability" | "failed";
+};
+
 export type ChatResult = {
   user_message: string;
   assistant_message: string;
-  audio_base64: string;
+  audio_base64: string | null;
+  voice_error?: string | null;
+  metadata: CognitiveMetadata;
 };
 
 export async function chatWithVoice(input: {
   message: string;
-  profile_id: string;
+  history?: { role: "user" | "assistant"; content: string }[];
+  profile_id?: string;
+  voice_enabled?: boolean;
   engine?: string;
   voice_style?: VoiceDelivery["voice_style"];
   speed?: number;
   bass_boost?: number;
-}): Promise<ChatResult & { audioSrc: string }> {
+}): Promise<ChatResult & { audioSrc?: string }> {
   const response = await fetch(`${API_URL}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ...input,
+      history: input.history || [],
+      voice_enabled: input.voice_enabled ?? true,
       engine: input.engine || "qwen",
       voice_style: input.voice_style || "theater_auto",
     }),
@@ -172,21 +232,25 @@ export async function chatWithVoice(input: {
   const data = await response.json();
   return {
     ...data,
-    audioSrc: `data:audio/wav;base64,${data.audio_base64}`,
+    audioSrc: data.audio_base64 ? `data:audio/wav;base64,${data.audio_base64}` : undefined,
   };
 }
 
 export async function voiceChat(input: {
   audio: Blob;
-  profile_id: string;
+  profile_id?: string;
+  voice_enabled?: boolean;
+  history?: { role: "user" | "assistant"; content: string }[];
   engine?: string;
   voice_style?: VoiceDelivery["voice_style"];
   speed?: number;
   bass_boost?: number;
-}): Promise<ChatResult & { audioSrc: string }> {
+}): Promise<ChatResult & { audioSrc?: string }> {
   const form = new FormData();
   form.append("file", input.audio, "recording.webm");
-  form.append("profile_id", input.profile_id);
+  if (input.profile_id) form.append("profile_id", input.profile_id);
+  form.append("voice_enabled", String(input.voice_enabled ?? true));
+  form.append("history_json", JSON.stringify(input.history || []));
   form.append("engine", input.engine || "qwen");
   form.append("voice_style", input.voice_style || "theater_auto");
 
@@ -195,6 +259,28 @@ export async function voiceChat(input: {
   const data = await response.json();
   return {
     ...data,
-    audioSrc: `data:audio/wav;base64,${data.audio_base64}`,
+    audioSrc: data.audio_base64 ? `data:audio/wav;base64,${data.audio_base64}` : undefined,
   };
+}
+
+export async function getBrainStatus(): Promise<BrainStatus> {
+  const response = await fetch(`${API_URL}/api/brain/status`, { cache: "no-store" });
+  if (!response.ok) await parseError(response, "Failed to get brain status");
+  return response.json();
+}
+
+export async function runBrainTask(input: {
+  message: string;
+  history?: { role: string; content: string }[];
+}): Promise<CognitiveResult> {
+  const response = await fetch(`${API_URL}/api/brain/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message: input.message,
+      history: input.history || [],
+    }),
+  });
+  if (!response.ok) await parseError(response, "Cognitive task execution failed");
+  return response.json();
 }

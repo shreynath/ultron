@@ -1,22 +1,19 @@
 import { DictationMic, TTSPlayer } from "@/components/StudioPanels";
-import { TalkMode } from "@/components/TalkMode";
 import { VoiceboxBanner } from "@/components/VoiceboxBanner";
 
 export default function StudioPage() {
   return (
-    <div className="space-y-8">
+    <div className="page-stack">
       <VoiceboxBanner />
 
-      <section>
-        <h2 className="text-3xl font-semibold">Studio</h2>
-        <p className="mt-2 text-zinc-400">
-          Talk to your cloned voice, dictate, or generate speech.
+      <section className="page-heading">
+        <h1>Studio</h1>
+        <p>
+          Advanced voice tools. Everyday conversation, dictation, and automatic voice delivery live on the Conversation page.
         </p>
       </section>
 
-      <TalkMode />
-
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="studio-grid">
         <DictationMic />
         <TTSPlayer />
       </div>

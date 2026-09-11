@@ -72,6 +72,7 @@ async def direct_generate(
     instruct: str | None = None,
     effects_chain: list[dict[str, Any]] | None = None,
     normalize: bool = True,
+    seed: int | None = None,
 ) -> bytes:
     await init_direct_engine()
     _ensure_vendor_path()
@@ -90,6 +91,7 @@ async def direct_generate(
         model_size="1.7B",
         instruct=instruct,
         normalize=normalize,
+        seed=seed,
     )
 
     if effects_chain:

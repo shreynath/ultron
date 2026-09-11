@@ -29,3 +29,6 @@ packages = ["app"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "live_ollama: optional tests that call a configured Ollama instance",
+]

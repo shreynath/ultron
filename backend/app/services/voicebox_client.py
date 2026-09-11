@@ -210,6 +210,7 @@ class VoiceboxClient:
         instruct: str | None = None,
         effects_chain: list[dict[str, Any]] | None = None,
         normalize: bool = True,
+        seed: int | None = None,
     ) -> bytes:
         async with _tts_generation_lock:
             return await self._generate_locked(
@@ -220,6 +221,7 @@ class VoiceboxClient:
                 instruct=instruct,
                 effects_chain=effects_chain,
                 normalize=normalize,
+                seed=seed,
             )
 
     async def _generate_locked(
@@ -231,6 +233,7 @@ class VoiceboxClient:
         instruct: str | None = None,
         effects_chain: list[dict[str, Any]] | None = None,
         normalize: bool = True,
+        seed: int | None = None,
     ) -> bytes:
         payload: dict[str, Any] = {
             "text": text,
@@ -239,6 +242,8 @@ class VoiceboxClient:
             "model_size": "1.7B",
             "normalize": normalize,
         }
+        if seed is not None:
+            payload["seed"] = seed
         normalized = normalize_engine(engine)
         if normalized:
             payload["engine"] = normalized
@@ -256,6 +261,7 @@ class VoiceboxClient:
                 instruct=instruct,
                 effects_chain=effects_chain,
                 normalize=normalize,
+                seed=seed,
             )
 
         await self._ensure_engine()

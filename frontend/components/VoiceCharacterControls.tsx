@@ -19,16 +19,20 @@ export function VoiceCharacterControls({
   onChange,
   id = "voice-character",
 }: VoiceCharacterControlsProps) {
+  const theaterEnabled = value.voice_style !== "natural";
   return (
-    <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-      <div>
-        <h3 className="text-sm font-medium text-zinc-200">Theater delivery</h3>
-        <p className="mt-1 text-xs text-zinc-500">
+    <div className="card space-y-4 !rounded-[14px] !p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+        <h3 className="text-sm font-medium text-[color:var(--steel-200)]">Theater delivery</h3>
+        <p className="mt-1 text-xs text-[color:var(--text-tertiary)]">
           Analyzes your text and applies depth, reverb, pace, and emphasis in one smooth pass.
         </p>
+        </div>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-[color:var(--text-secondary)]"><input type="checkbox" checked={theaterEnabled} onChange={(event) => onChange({ voice_style: event.target.checked ? "theater_auto" : "natural" })} />On</label>
       </div>
 
-      <div>
+      {theaterEnabled && <div>
         <label className="label" htmlFor={`${id}-style`}>
           Mode
         </label>
@@ -47,7 +51,7 @@ export function VoiceCharacterControls({
           <option value="ultron_cinematic">Cinematic (heavy FX)</option>
           <option value="natural">Natural (no FX)</option>
         </select>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -9,18 +9,20 @@ export default function VoicesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
-    <div className="space-y-8">
+    <div className="page-stack">
       <VoiceboxBanner />
-      <section>
-        <h2 className="text-3xl font-semibold">Voice Profiles</h2>
-        <p className="mt-2 text-zinc-400">
+      <section className="page-heading">
+        <h1>Voice Profiles</h1>
+        <p>
           Upload a long YouTube video or audio file. Ultron extracts the best speech clips and
           builds a zero-shot cloned voice.
         </p>
       </section>
 
-      <VoiceUploader onCreated={() => setRefreshKey((value) => value + 1)} />
-      <VoiceProfileList refreshKey={refreshKey} />
+      <div className="voice-page-grid">
+        <VoiceUploader onCreated={() => setRefreshKey((value) => value + 1)} />
+        <VoiceProfileList refreshKey={refreshKey} />
+      </div>
     </div>
   );
 }

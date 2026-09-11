@@ -6,8 +6,6 @@ import { ENGINE_OPTIONS } from "@/components/VoiceProfilePicker";
 
 type Step = "idle" | "downloading" | "extracting" | "transcribing" | "creating" | "done" | "error";
 
-const steps: Step[] = ["downloading", "extracting", "transcribing", "creating"];
-
 export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
@@ -66,10 +64,10 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
   }
 
   return (
-    <form className="card space-y-5" onSubmit={handleSubmit}>
+    <form className="card space-y-5 liquid-target" onSubmit={handleSubmit}>
       <div>
         <h2 className="text-xl font-semibold">Clone a Voice</h2>
-        <p className="mt-1 text-sm text-zinc-400">
+        <p className="mt-1 text-sm text-[color:var(--text-secondary)]">
           Paste a long YouTube clip (e.g. 10 min Ultron scenes). Ultron automatically finds solo
           monologue segments, rejects other characters, and tunes pace and depth to match the
           reference.
@@ -127,39 +125,21 @@ export function VoiceUploader({ onCreated }: { onCreated?: () => void }) {
         <label className="label" htmlFor="voice-file">
           Or upload file
         </label>
-        <input
-          id="voice-file"
-          type="file"
-          accept="audio/*,video/*,.mp3,.mp4,.wav,.m4a"
-          className="block w-full text-sm text-zinc-300 file:mr-4 file:rounded-lg file:border-0 file:bg-zinc-800 file:px-4 file:py-2 file:text-sm file:text-zinc-100"
-          onChange={(event) => {
+        <label className="dropzone" htmlFor="voice-file">
+          <input id="voice-file" type="file" accept="audio/*,video/*,.mp3,.mp4,.wav,.m4a" onChange={(event) => {
             setFile(event.target.files?.[0] ?? null);
             if (event.target.files?.[0]) setUrl("");
-          }}
-        />
+          }} />
+          <span>{file ? `◌  ${file.name}` : "Drop an audio or video file here, or click to browse"}</span>
+        </label>
       </div>
 
       {step !== "idle" && step !== "done" && step !== "error" && (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 text-sm">
-          <p className="mb-3 text-zinc-300">Processing...</p>
-          <div className="space-y-2">
-            {steps.map((item) => (
-              <p
-                key={item}
-                className={item === step ? "text-violet-300" : "text-zinc-500"}
-              >
-                {item === "downloading" && "Downloading source audio"}
-                {item === "extracting" && "Extracting best speech clips"}
-                {item === "transcribing" && "Transcribing reference samples"}
-                {item === "creating" && "Creating voice profile"}
-              </p>
-            ))}
-          </div>
-        </div>
+        <div className="scan-progress">{step === "downloading" && "Retrieving reference media…"}{step === "extracting" && "Extracting monologue segments…"}{step === "transcribing" && "Analyzing reference speech…"}{step === "creating" && "Creating voice profile…"}</div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      {result && <p className="text-sm text-emerald-400">{result}</p>}
+      {error && <p className="error-copy">⚠ {error}</p>}
+      {result && <p className="success-copy">{result}</p>}
 
       <button
         className="btn-primary"

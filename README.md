@@ -1,22 +1,24 @@
 # Ultron Voice
 
-Phase 1 of Ultron: a custom voice studio for **dictation** and **zero-shot voice cloning**, with the open-source [Voicebox](https://github.com/jamiepine/voicebox) engine **embedded directly** — no separate desktop app required.
+Ultron is a conversation-first cognitive assistant with integrated cloned voice delivery. It uses the open-source [Voicebox](https://github.com/jamiepine/voicebox) engine **embedded directly** — no separate desktop app required.
 
 ## What it does
 
+- Hold a text or voice conversation through the Executive and Cognitive Runtime
+- Hear normal assistant responses automatically in a cloned voice when voice output is enabled
 - Clone any voice from a YouTube URL, MP3, MP4, or WAV
-- Extract the best speech clips automatically from long source audio
-- Dictate with your microphone (Whisper via embedded engine)
-- Generate speech in cloned voices with cinematic delivery controls (depth, reverb, pace)
-- Talk mode: chat with Ollama and hear replies in your cloned voice
-- Optionally refine transcripts with Ollama Cloud
+- Use advanced dictation and standalone TTS tools when needed
 
 ## Architecture
 
 ```
 Ultron Web UI (Next.js :3000)
         ↓
-Ultron API (FastAPI :8000)
+Conversation API (FastAPI :8000)
+        ↓
+Executive → Cognitive Runtime → optional single safe capability → grounded response
+        ↓
+Optional Voicebox delivery
         ↓
 Embedded Voicebox engine (vendor/voicebox, MLX on Apple Silicon :17493)
 ```
@@ -78,10 +80,10 @@ Open http://localhost:3000
 
 ## Usage
 
-1. Launch **Voicebox** and wait for it to start (API on `http://127.0.0.1:17493`)
-2. Start Ultron backend and frontend
-3. Go to **Voices** → paste a YouTube URL or upload media → clone
-4. Go to **Studio** → dictate or generate speech with your cloned voice
+1. Start Ultron backend and frontend.
+2. Open **Conversation** and type or use the microphone.
+3. Open **Voice** settings to select a cloned profile for automatic playback.
+4. Use **Voices** to create profiles and **Advanced** for standalone voice tools.
 
 ## Environment variables
 
@@ -112,6 +114,18 @@ Rotate your Ollama API key if it was ever shared in chat or committed by mistake
 
 ## Roadmap
 
-- Phase 2: Conversational agent with cloned voice output
-- Phase 3: Higher-fidelity fine-tuning on longer datasets
-- Phase 4+: Broader AGI capabilities beyond voice
+The cognitive architecture has a deliberately finite roadmap. Steps 1–6 and the integration hardening Step 6.5 are implemented; later entries are not current capabilities.
+
+1. Executive Cognitive Layer
+2. Cognitive Runtime
+3. Working Memory & Cognitive Context
+4. Cognitive Planner
+5. Action Executor & Capability Boundary
+6. Execution Observation & Result Interpretation
+6.5. Conversation-Centered UI & Integration Hardening — including the bounded, capability-backed conversation bridge
+7. Verification & Evidence
+8. Bounded Execution Coordinator
+9. Persistent Memory
+10. Cognitive State & Adaptation
+11. Deliberation & Replanning
+12. Bounded Cognitive Loop

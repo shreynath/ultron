@@ -7,7 +7,7 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import chat, speak, transcribe, voices
+from app.routers import brain, chat, speak, transcribe, voices
 from app.services.media_ingest import ensure_ffmpeg, ensure_yt_dlp
 from app.services.voice_engine import get_engine_manager, shutdown_direct_engine
 from app.services.voicebox_client import VoiceboxClient
@@ -40,6 +40,10 @@ async def health():
             "yt_dlp": ensure_yt_dlp(),
         },
         "ollama_configured": bool(settings.ollama_api_key),
+        "brain": {
+            "ok": True,
+            "model": settings.brain_model or settings.ollama_model,
+        },
     }
 
 
@@ -75,6 +79,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(health_router)
+    app.include_router(brain.router)
     app.include_router(voices.router)
     app.include_router(transcribe.router)
     app.include_router(chat.router)

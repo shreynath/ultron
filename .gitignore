@@ -38,3 +38,7 @@ backend/data/
 
 # Logs
 *.log
+
+# Local transfer notes — never commit
+HANDOFF.txt
+HANDOFF*.txt
