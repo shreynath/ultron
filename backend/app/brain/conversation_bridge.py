@@ -14,10 +14,12 @@ from app.brain.conversation_capabilities import (
     ConversationAction,
     ConversationCapabilityRegistry,
 )
+from app.brain.document_analysis import DocumentAnalysisCapability
 from app.brain.executor import ActionExecutor
 from app.brain.observation import ExecutionObservation, ObservationInterpreter
 from app.brain.reference_capability import ReferenceCapability
-from app.brain.schemas import TaskAssessment
+from app.brain.research_capability import ResearchCapability
+from app.brain.schemas import TaskAssessment, TaskType
 from app.brain.weather import WeatherCapability
 from app.brain.working_memory import CognitiveContext
 
@@ -50,7 +52,9 @@ class ConversationCapabilityBridge:
         executor: ActionExecutor | None = None,
         observer: ObservationInterpreter | None = None,
     ) -> None:
-        self._registry = registry or ConversationCapabilityRegistry((WeatherCapability(), ReferenceCapability()))
+        self._registry = registry or ConversationCapabilityRegistry(
+            (WeatherCapability(), ReferenceCapability(), DocumentAnalysisCapability(), ResearchCapability())
+        )
         self._executor = executor or ActionExecutor(
             registry=self._registry.executor_registry,
             allowed_capabilities=self._registry.names(),
@@ -82,20 +86,20 @@ class ConversationCapabilityBridge:
             return CapabilitySelection(descriptor=descriptor, action=action)
         return None
 
-    async def execute(
-        self,
-        *,
-        context: CognitiveContext,
-    ) -> ConversationCapabilityOutcome | None:
-        selection = self.select(
-            user_input=context.working_memory.user_input,
-            assessment=context.task.assessment,
-        )
+    def select_for_context(self, context: CognitiveContext) -> CapabilitySelection | None:
+        """Select one application-owned action for an already-created task.
+
+        Keeping follow-up resolution here gives higher-level coordinators a
+        truthful selection boundary without making them parse conversation
+        text or duplicate capability policy.
+        """
+
         # A narrowly recognized weather follow-up such as "what about the
         # temperature?" has no location of its own. Reuse only an explicit
         # prior user location to perform one *new* lookup; an unrelated request
         # must never be interpreted as a follow-up or inherit a prior action.
-        if selection is None and _WEATHER_FOLLOW_UP.fullmatch(context.working_memory.user_input):
+        selection = None
+        if _WEATHER_FOLLOW_UP.fullmatch(context.working_memory.user_input):
             for message in reversed(context.working_memory.recent_history):
                 if message.role != "user":
                     continue
@@ -106,7 +110,47 @@ class ConversationCapabilityBridge:
                 if selection is not None:
                     break
         if selection is None:
+            selection = self.select(
+                user_input=context.working_memory.user_input,
+                assessment=context.task.assessment,
+            )
+        # A corpus selection naturally follows an earlier exact-position
+        # question. Carry that earlier target as untrusted request data; only
+        # the registered deterministic capability can interpret it.
+        if selection is None and re.search(r"\b(?:king\s+james|kjv)\b", context.working_memory.user_input, re.I):
+            for message in reversed(context.working_memory.recent_history):
+                if message.role != "user":
+                    continue
+                if re.search(r"\b\d+(?:st|nd|rd|th)\s+word\b|\bwords?\s+\d+\s+(?:through|to|-)\s+\d+\b", message.content, re.I):
+                    selection = self.select(
+                        user_input=f"{message.content}\nCorpus selection: {context.working_memory.user_input}",
+                        assessment=context.task.assessment.model_copy(update={
+                            "requires_tools": True,
+                            "task_type": TaskType.RETRIEVAL,
+                            "direct_response_allowed": False,
+                        }),
+                    )
+                    break
+        return selection
+
+    async def execute(
+        self,
+        *,
+        context: CognitiveContext,
+    ) -> ConversationCapabilityOutcome | None:
+        selection = self.select_for_context(context)
+        if selection is None:
             return None
+        return await self.execute_selection(context=context, selection=selection)
+
+    async def execute_selection(
+        self,
+        *,
+        context: CognitiveContext,
+        selection: CapabilitySelection,
+    ) -> ConversationCapabilityOutcome:
+        """Execute exactly one previously selected, registered action once."""
+
         request = ActionRequest(
             task_id=context.task.task_id,
             capability=selection.descriptor.name,

@@ -5,11 +5,11 @@ Ultron bundles the open-source [Voicebox](https://github.com/jamiepine/voicebox)
 ## How it works
 
 ```
-Next.js UI  →  Ultron FastAPI  →  Embedded Voicebox engine (vendor/voicebox)
+Next.js UI  →  Ultron FastAPI  →  Embedded Voicebox engine (backend/vendor/voicebox)
 ```
 
-- `vendor/voicebox/` — vendored Voicebox source (MIT)
-- `scripts/setup-voicebox-engine.sh` — installs engine Python deps into `vendor/voicebox/backend/venv`
+- `backend/vendor/voicebox/` — vendored Voicebox source (MIT)
+- `scripts/setup-voicebox-engine.sh` — installs engine Python deps into `backend/vendor/voicebox/backend/venv`
 - `scripts/dev.sh` — starts engine + Ultron backend + frontend in one command
 
 ## Modes (`VOICE_ENGINE_MODE`)
@@ -30,7 +30,7 @@ Override with `ULTRON_VOICEBOX_DATA_DIR`. Voice profiles and downloaded models p
 
 ## Ultron customizations
 
-Patches in `vendor/voicebox/` (documented here, not upstream):
+Patches in `backend/vendor/voicebox/` (documented here, not upstream):
 
 - **MLX instruct forwarding** — passes delivery/emotion `instruct` to mlx-audio when supported
 - **Qwen ICL reference selection** — Qwen Base uses one clean, self-contained

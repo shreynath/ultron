@@ -101,6 +101,35 @@ Live Executive tests remain opt-in:
 
     ULTRON_LIVE_BRAIN=1 pytest tests/test_brain_live.py
 
+## Learning integration
+
+The coordinator supplies the production runtime with durable learning storage.
+After assessment it retrieves only verified, provenance-bearing system
+experience and places it in bounded Working Memory as untrusted reference data.
+The planner receives that data in its existing task payload and cannot treat it
+as policy, authorization, or commands. After any terminal lifecycle, the
+coordinator records a sanitized experience and promotes only Step 7
+evidence-verified claims. This post-execution step cannot change the route,
+action, verification result, or lifecycle outcome. See
+[BRAIN_LEARNING.md](BRAIN_LEARNING.md) for persistence and confidence rules.
+
+## Relationship to Step 8
+
+Step 8's `BoundedExecutionCoordinator` now uses this runtime as its routing,
+response, and verification integration point for normal chat.
+`handle_conversation(...)` remains the stable public entry point and delegates
+to that coordinator. The runtime continues to own no lifecycle state machine:
+it exposes the existing application-owned capability selection, one-action
+dispatch, and result-completion seams so the coordinator can record real
+transitions without duplicating those subsystems.
+
 ## Deliberately not implemented
 
-The runtime does not execute plans, general tools, memory retrieval, verification, learning, agent loops, autonomous behavior, model routing, or new frontend and voice behavior. The Step 6.5 bridge is the narrow exception: one registered, safe action may run after routing and immediately stops after its observation. Future execution subsystems attach at the cognitive_execution_required boundary and consume the existing assessment and optional plan.
+The runtime does not execute plans, general tools, memory retrieval, learning,
+agent loops, autonomous behavior, model routing, or new frontend and voice
+behavior. The Step 6.5 bridge is the narrow exception: one registered, safe
+action may run after routing and immediately stops after its observation. Step
+8 makes that bounded path observable; it does not turn it into a multi-action
+execution loop. Future execution subsystems attach at the
+`cognitive_execution_required` boundary and consume the existing assessment
+and optional plan.

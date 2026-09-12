@@ -3,11 +3,12 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, HTTPException
+from fastapi import APIRouter, FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import brain, chat, speak, transcribe, voices
+from app.routers import brain, chat, local_intelligence, speak, transcribe, voices
 from app.services.media_ingest import ensure_ffmpeg, ensure_yt_dlp
 from app.services.voice_engine import get_engine_manager, shutdown_direct_engine
 from app.services.voicebox_client import VoiceboxClient
@@ -39,10 +40,10 @@ async def health():
             "ffmpeg": ensure_ffmpeg(),
             "yt_dlp": ensure_yt_dlp(),
         },
-        "ollama_configured": bool(settings.ollama_api_key),
+        "ollama_configured": False,
         "brain": {
             "ok": True,
-            "model": settings.brain_model or settings.ollama_model,
+            "model": settings.brain_model or "local:general",
         },
     }
 
@@ -78,8 +79,21 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def basic_deployment_guards(request: Request, call_next):
+        """Small framework-level guard; privileged research has its own token."""
+        length = request.headers.get("content-length")
+        if length and length.isdigit() and int(length) > settings.api_max_body_bytes:
+            return JSONResponse(status_code=413, content={"detail": "Request body is too large."})
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        return response
     app.include_router(health_router)
     app.include_router(brain.router)
+    app.include_router(local_intelligence.router)
     app.include_router(voices.router)
     app.include_router(transcribe.router)
     app.include_router(chat.router)

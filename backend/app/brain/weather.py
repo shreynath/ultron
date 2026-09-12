@@ -17,6 +17,7 @@ from app.brain.conversation_capabilities import (
     ConversationAction,
 )
 from app.brain.schemas import TaskAssessment, TaskType
+from app.local_intelligence.network import require_network_tool
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
@@ -144,6 +145,7 @@ class WeatherCapability:
     async def execute(self, operation: str, parameters: BaseModel) -> CapabilityResult:
         if operation != "current_weather" or not isinstance(parameters, WeatherParameters):
             raise WeatherCapabilityError("Unsupported weather operation")
+        require_network_tool("weather")
         timeout = httpx.Timeout(self._timeout)
         try:
             async with httpx.AsyncClient(

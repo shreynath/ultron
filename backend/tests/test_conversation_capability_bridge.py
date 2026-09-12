@@ -166,6 +166,47 @@ def test_selection_requires_a_real_registered_capability() -> None:
     assert bridge.select(user_input="unknown request", assessment=_assessment()) is None
 
 
+def test_default_registry_connects_external_retrieval_to_web_research() -> None:
+    bridge = ConversationCapabilityBridge()
+    selection = bridge.select(
+        user_input="Who is the current CEO of NVIDIA?",
+        assessment=_assessment(task_type=TaskType.RETRIEVAL),
+    )
+
+    assert selection is not None
+    assert selection.descriptor.name == "web_research"
+    assert selection.action.operation == "research"
+
+
+def test_default_registry_returns_corpus_clarification_through_a_real_capability() -> None:
+    bridge = ConversationCapabilityBridge()
+    selection = bridge.select(
+        user_input="what is the 500th word in the bible",
+        assessment=_assessment(task_type=TaskType.RETRIEVAL),
+    )
+
+    assert selection is not None
+    assert selection.descriptor.name == "web_research"
+    assert selection.action.operation == "clarify_corpus"
+
+
+@pytest.mark.anyio
+async def test_corpus_ambiguity_executes_authorized_capability_not_missing_capability_fallback() -> None:
+    runtime = CognitiveRuntime(response_generator=AsyncMock(side_effect=RuntimeError("model unavailable")))
+
+    execution = await runtime.handle_conversation(
+        user_input="what is the 500th word in the bible",
+        history=[],
+        assessment=_assessment(task_type=TaskType.RETRIEVAL),
+    )
+
+    assert execution.status is ExecutionStatus.COMPLETED
+    assert execution.capability_name == "web_research"
+    assert execution.capability_operation == "clarify_corpus"
+    assert "translation" in execution.answer.lower()
+    assert "matching retrieval capability" not in execution.answer
+
+
 def test_weather_selector_preserves_an_explicit_spoken_location_for_geocoding() -> None:
     bridge = _weather_bridge()
 
@@ -254,11 +295,11 @@ async def test_weather_conversation_uses_provider_output_even_when_llm_is_unavai
     assert "84°F" in execution.answer
     assert "College Station, Texas, United States" in execution.answer
     assert "Ollama" not in execution.answer
-    assert execution.response_generation_status == "fallback"
+    assert execution.response_generation_status == "grounded_capability"
 
 
 @pytest.mark.anyio
-async def test_weather_result_is_supplied_as_authoritative_context_to_response_generation() -> None:
+async def test_weather_result_is_rendered_only_from_the_authoritative_action_result() -> None:
     generator = AsyncMock(return_value="It is 84°F and partly cloudy in College Station, Texas.")
     runtime = CognitiveRuntime(response_generator=generator, conversation_bridge=_weather_bridge())
 
@@ -269,13 +310,9 @@ async def test_weather_result_is_supplied_as_authoritative_context_to_response_g
     )
 
     assert execution.status is ExecutionStatus.COMPLETED
-    assert execution.answer == "It is 84°F and partly cloudy in College Station, Texas."
-    assert execution.response_generation_status == "generated"
-    generator.assert_awaited_once()
-    prompt = generator.await_args.kwargs["system_prompt"]
-    assert "weather.current_weather" in prompt
-    assert '"temperature_f": 84.0' in prompt
-    assert '"condition": "Partly cloudy"' in prompt
+    assert "84°F" in execution.answer
+    assert execution.response_generation_status == "grounded_capability"
+    generator.assert_not_awaited()
 
 
 @pytest.mark.anyio

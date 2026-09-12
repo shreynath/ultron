@@ -34,3 +34,12 @@ Step 5 does not implement autonomous agents, multi-step execution loops, replann
 ## Configuration
 
 - `BRAIN_ACTION_TIMEOUT` — internal action deadline in seconds; defaults to `30`, must be greater than zero and no more than `60`.
+
+## Multi-step graphs
+
+`PlanExecutionCoordinator` composes this executor for a finite
+application-built action graph. It does not translate planner prose into
+actions. Each supplied `ActionRequest` must match a validated plan step and is
+individually authorized by this executor; dependencies are ordered, failed
+dependencies block their dependents, and cancellation propagates. This is the
+only supported multi-step execution path.

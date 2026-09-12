@@ -32,7 +32,13 @@ _WEATHER_FOLLOW_UP_MARKERS = re.compile(
 )
 _EXACT_EVIDENCE_MARKERS = re.compile(
     r"\b(?:first\s+\d+\s+digits?|\d+(?:st|nd|rd|th)\s+(?:word|character|item|verse|record|digit)|"
+    r"(?:words?|tokens?)\s+\d+\s*(?:through|to|-)\s*\d+|"
     r"surface\s+temperature|temperature\s+of\s+(?:the\s+)?(?:moon|sun)|king\s+james\s+bible)\b",
+    re.IGNORECASE,
+)
+_BROAD_RESEARCH_MARKERS = re.compile(
+    r"\b(?:list|identify|catalog|enumerate)\b.{0,80}\b(?:every|all)\b.{0,40}\b(?:component|part|subsystem|element|feature)s?\b"
+    r"|\b(?:every|all)\s+(?:single\s+)?(?:component|part|subsystem|element|feature)s?\b",
     re.IGNORECASE,
 )
 
@@ -107,6 +113,16 @@ def normalize_output(
         data["requires_verification"] = True
         data["direct_response_allowed"] = False
         data["reasoning_budget"] = ReasoningBudget.LOW
+
+    if _BROAD_RESEARCH_MARKERS.search(user_input):
+        data["task_type"] = TaskType.RESEARCH
+        data["complexity"] = Complexity.COMPLEX
+        data["requires_tools"] = True
+        data["requires_memory"] = False
+        data["requires_planning"] = True
+        data["requires_verification"] = True
+        data["direct_response_allowed"] = False
+        data["reasoning_budget"] = ReasoningBudget.HIGH
 
     if data["task_type"] in CASUAL_TYPES:
         over_escalated = (

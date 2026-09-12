@@ -80,10 +80,11 @@ def test_list_voices_unavailable():
     assert response.status_code == 502
 
 
-def test_refine_without_ollama_key():
+def test_refine_without_ollama_key_uses_local_model():
     with patch("app.config.settings.ollama_api_key", ""):
         response = client.post("/api/transcribe/refine", json={"text": "hello um world"})
-    assert response.status_code == 400
+    assert response.status_code == 200
+    assert isinstance(response.json()["text"], str)
 
 
 def test_chat_assesses_routes_then_uses_existing_reply_path():
@@ -115,6 +116,8 @@ def test_chat_assesses_routes_then_uses_existing_reply_path():
         "task_type": "conversation",
         "route": "direct_response",
         "status": "completed",
+        "request_id": None,
+        "execution_events": None,
     }
     mock_assess.assert_awaited_once_with("Hey Ultron, how are you?", history=[])
     mock_handle.assert_awaited_once_with(
@@ -185,7 +188,11 @@ def test_chat_weather_uses_the_real_executive_runtime_bridge_and_executor_path()
         "task_type": "retrieval",
         "route": "cognitive_execution_required",
         "status": "completed",
+        "request_id": data["metadata"]["request_id"],
+        "execution_events": data["metadata"]["execution_events"],
     }
+    assert data["metadata"]["request_id"]
+    assert "CAPABILITY_COMPLETED" in data["metadata"]["execution_events"]
     assert "89°F" in data["assistant_message"]
     assert "College Station, Texas, United States" in data["assistant_message"]
     assert "live weather data" not in data["assistant_message"]

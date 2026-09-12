@@ -18,6 +18,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["ruff>=0.8.0", "pytest>=8.3.0"]
+# MLX-LM is intentionally optional: a fresh API boot must not download models
+# or pull a hosted inference dependency.  Install it only on supported Apple
+# Silicon machines after placing verified model weights in ULTRON_HOME/models.
+local = ["mlx-lm>=0.28.0"]
 
 [build-system]
 requires = ["hatchling"]

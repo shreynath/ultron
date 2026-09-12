@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.brain.executive import Executive, bound_history
+from app.brain.executive import Executive, bound_history, normalize_provider_assessment
 from app.brain.normalize import (
     normalize_output,
     requires_live_information,
@@ -246,6 +246,55 @@ def test_parse_structured_content_rejects_prose():
 def test_parse_structured_content_accepts_fenced_json():
     parsed = parse_structured_content("```json\n{\"task_type\": \"casual\"}\n```")
     assert parsed["task_type"] == "casual"
+
+
+def test_parse_structured_content_accepts_provider_wrappers_and_json_preamble():
+    wrapped = parse_structured_content({"response": "```JSON\n{\"task_type\": \"casual\"}\n```"})
+    prefixed = parse_structured_content("Here is the object: {\"task_type\": \"casual\"}")
+    assert wrapped["task_type"] == "casual"
+    assert prefixed["task_type"] == "casual"
+
+
+def test_parse_structured_content_rejects_json_with_trailing_prose():
+    with pytest.raises(OllamaError):
+        parse_structured_content('{"task_type":"casual"} thanks')
+
+
+def test_provider_tools_alias_is_normalized_without_coercion() -> None:
+    assert normalize_provider_assessment({
+        "requires_external_tools": False,
+        "multi_step_planning": False,
+        "multi_step": False,
+        "verification_needed": True,
+    }) == {
+        "requires_tools": False,
+        "requires_planning": False,
+        "requires_verification": True,
+    }
+
+
+def test_provider_universal_task_types_are_mapped_without_granting_capabilities() -> None:
+    assert normalize_provider_assessment({
+        "task_type": "corpus_analysis",
+        "task_types": ["historical_research", "corpus_analysis", "calculation"],
+    }) == {
+        "task_type": "retrieval",
+        "task_types": ["research", "retrieval", "computation"],
+    }
+    conflicting = {"requires_tools": True, "requires_external_tools": False}
+    assert normalize_provider_assessment(conflicting) == conflicting
+
+
+def test_broad_component_catalog_is_forced_through_research() -> None:
+    normalized = normalize_output(
+        ExecutiveOutput.model_validate(_payload()),
+        "List out every single component of an F1 car please.",
+    )
+    assert normalized.task_type is TaskType.RESEARCH
+    assert normalized.requires_tools is True
+    assert normalized.requires_planning is True
+    assert normalized.requires_verification is True
+    assert normalized.direct_response_allowed is False
 
 
 def test_user_prompt_injection_does_not_crash_and_stays_data():

@@ -43,6 +43,8 @@ class ConversationMetadata(BaseModel):
     task_type: str
     route: str
     status: str
+    request_id: str | None = None
+    execution_events: tuple[str, ...] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -79,9 +81,11 @@ async def _run_conversation(
             system_prompt=system_prompt,
         )
         return execution.answer, ConversationMetadata(
-            task_type=assessment.task_type.value,
+            task_type=execution.assessment.task_type.value,
             route=execution.route.value,
             status=execution.status.value,
+            request_id=str(execution.request_id) if execution.request_id else None,
+            execution_events=tuple(event.event for event in execution.trace) or None,
         )
     except Exception as exc:
         # Executive and runtime failures are not implementation details for the

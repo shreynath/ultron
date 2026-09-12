@@ -35,6 +35,7 @@ class ActionErrorCode(str, Enum):
     EXECUTION_FAILED = "execution_failed"
     EXECUTION_TIMEOUT = "execution_timeout"
     INTERNAL_ERROR = "internal_error"
+    DUPLICATE_ACTION = "duplicate_action"
 
 
 class ActionError(BaseModel):

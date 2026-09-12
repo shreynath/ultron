@@ -47,6 +47,11 @@ class ActionExecutor:
         if configured_timeout <= 0 or configured_timeout > 60:
             raise ValueError("Action timeout must be greater than zero and no more than 60 seconds")
         self._timeout = configured_timeout
+        # The executor is the final side-effect boundary. Keeping completed
+        # action identities here makes retrying one request idempotent for the
+        # process lifetime; task-local records cover repeated calls in context.
+        self._idempotency_lock = asyncio.Lock()
+        self._completed_actions: dict = {}
 
     @property
     def timeout(self) -> float:
@@ -70,16 +75,39 @@ class ActionExecutor:
             # safe identity available from an arbitrary object to form a result.
             raise TypeError("ActionExecutor requires validated CognitiveContext and ActionRequest")
 
-        result = self._validate_request(context=context, action=action, started=started)
-        if result is None:
-            capability = self._registry.get(action.capability)
-            assert capability is not None  # validated immediately above
-            result = await self._dispatch_once(
-                context=context,
-                action=action,
-                capability=capability,
-                started=started,
-            )
+        # This lock deliberately spans dispatch: two simultaneous requests
+        # carrying the same action identity cannot both cross the capability
+        # boundary. Registered actions are low-volume and bounded by timeout.
+        async with self._idempotency_lock:
+            existing = self._completed_actions.get(action.action_id)
+            if existing is not None:
+                if (
+                    existing.task_id != action.task_id
+                    or existing.capability != action.capability
+                    or existing.operation != action.operation
+                ):
+                    result = self._result(
+                        action, ActionStatus.REJECTED, started,
+                        ActionErrorCode.DUPLICATE_ACTION,
+                        "Action identity conflicts with an already executed action.",
+                    )
+                else:
+                    result = existing
+            else:
+                result = self._validate_request(context=context, action=action, started=started)
+                if result is None:
+                    capability = self._registry.get(action.capability)
+                    assert capability is not None  # validated immediately above
+                    result = await self._dispatch_once(
+                        context=context,
+                        action=action,
+                        capability=capability,
+                        started=started,
+                    )
+                    # Only a request that crossed the capability boundary is
+                    # idempotent. A local prerequisite rejection may become
+                    # valid once its dependency completes.
+                    self._completed_actions[action.action_id] = result
 
         self._record(context, action, result)
         self._log(action, result)

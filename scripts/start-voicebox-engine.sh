@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VB_ROOT="$ROOT/vendor/voicebox"
+VB_ROOT="$ROOT/backend/vendor/voicebox"
 VENV="$VB_ROOT/backend/venv"
 HOST="${ULTRON_VOICEBOX_HOST:-127.0.0.1}"
 PORT="${ULTRON_VOICEBOX_PORT:-17493}"

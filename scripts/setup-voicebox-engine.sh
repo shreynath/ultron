@@ -2,13 +2,13 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VB_ROOT="$ROOT/vendor/voicebox"
+VB_ROOT="$ROOT/backend/vendor/voicebox"
 BACKEND="$VB_ROOT/backend"
 VENV="$VB_ROOT/backend/venv"
 SLIM_REQ="$ROOT/scripts/voice-engine-requirements-mlx.txt"
 
 if [ ! -d "$VB_ROOT/.git" ]; then
-  echo "Voicebox source missing. Run: git clone --depth 1 https://github.com/jamiepine/voicebox.git vendor/voicebox"
+  echo "Voicebox source missing. Run: git clone --depth 1 https://github.com/jamiepine/voicebox.git backend/vendor/voicebox"
   exit 1
 fi
 
@@ -103,7 +103,7 @@ if [ "$recreate_venv" = true ]; then
 fi
 
 if [ ! -d "$VENV" ]; then
-  echo "Creating engine virtualenv at vendor/voicebox/backend/venv"
+  echo "Creating engine virtualenv at backend/vendor/voicebox/backend/venv"
   "$SYSTEM_PYTHON" -m venv "$VENV"
 fi
 

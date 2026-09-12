@@ -21,6 +21,7 @@ from app.brain.actions import (
 from app.brain.capabilities import CapabilityRegistry
 from app.brain.executor import ActionExecutor
 from app.brain.planner import ExecutionPlan, PlanCapability, PlanStatus, PlanStep
+from app.brain.plan_execution import PlanExecutionCoordinator, PlanExecutionStatus, PlanStepState
 from app.brain.runtime import CognitiveRuntime
 from app.brain.schemas import (
     Complexity,
@@ -180,6 +181,24 @@ async def test_executor_dispatches_one_valid_action_and_records_facts(caplog: py
 
 
 @pytest.mark.anyio
+async def test_same_action_identity_is_executed_only_once_under_concurrency() -> None:
+    context = _context()
+    capability = MockCapability(delay=0.01)
+    executor = _executor(capability)
+    action = _action(context)
+
+    first, second = await asyncio.gather(
+        executor.execute(context=context, action=action),
+        executor.execute(context=context, action=action),
+    )
+
+    assert first.status is ActionStatus.COMPLETED
+    assert second.status is ActionStatus.COMPLETED
+    assert first.action_id == second.action_id == action.action_id
+    assert len(capability.calls) == 1
+
+
+@pytest.mark.anyio
 async def test_registered_but_disallowed_capability_is_rejected_without_dispatch() -> None:
     context = _context()
     capability = MockCapability()
@@ -315,6 +334,59 @@ async def test_dependencies_require_actual_prior_executor_result() -> None:
     completed = await executor.execute(context=context, action=dependent)
     assert completed.status is ActionStatus.COMPLETED
     assert len(capability.calls) == 2
+
+
+@pytest.mark.anyio
+async def test_application_built_plan_graph_orders_steps_and_blocks_dependents() -> None:
+    context = _context()
+    plan = _plan(context)
+    plan.steps[1].depends_on = ["step_1"]
+    actions = {
+        step.id: ActionRequestBuilder.from_plan_step(
+            context=context,
+            plan=plan,
+            step_id=step.id,
+            capability="computation",
+            operation="double",
+            parameters={"value": index + 1},
+        )
+        for index, step in enumerate(plan.steps)
+    }
+    capability = MockCapability()
+    execution = await PlanExecutionCoordinator(executor=_executor(capability)).execute(
+        context=context,
+        plan=plan,
+        actions=actions,
+    )
+
+    assert execution.status is PlanExecutionStatus.COMPLETED
+    assert [item.step_id for item in execution.steps] == ["step_1", "step_2", "step_3"]
+    assert all(item.state is PlanStepState.COMPLETED for item in execution.steps)
+    assert len(capability.calls) == 3
+
+    failed_context = _context()
+    failed_plan = _plan(failed_context)
+    failed_plan.steps[1].depends_on = ["step_1"]
+    failed_actions = {
+        step.id: ActionRequestBuilder.from_plan_step(
+            context=failed_context,
+            plan=failed_plan,
+            step_id=step.id,
+            capability="computation",
+            operation="double",
+            parameters={"value": 1},
+        )
+        for step in failed_plan.steps
+    }
+    failed = await PlanExecutionCoordinator(executor=_executor(MockCapability(error=RuntimeError()))).execute(
+        context=failed_context,
+        plan=failed_plan,
+        actions=failed_actions,
+    )
+
+    assert failed.status is PlanExecutionStatus.FAILED
+    assert failed.steps[0].state is PlanStepState.FAILED
+    assert failed.steps[1].state is PlanStepState.BLOCKED
 
 
 @pytest.mark.anyio

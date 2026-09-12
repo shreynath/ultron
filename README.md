@@ -16,11 +16,11 @@ Ultron Web UI (Next.js :3000)
         ↓
 Conversation API (FastAPI :8000)
         ↓
-Executive → Cognitive Runtime → optional single safe capability → grounded response
+Executive → planning/retrieval → authorized capability → observation → verification → learning
         ↓
 Optional Voicebox delivery
         ↓
-Embedded Voicebox engine (vendor/voicebox, MLX on Apple Silicon :17493)
+Embedded Voicebox engine (backend/vendor/voicebox, MLX on Apple Silicon :17493)
 ```
 
 See [docs/VOICE_ENGINE.md](docs/VOICE_ENGINE.md) for engine modes and customization.
@@ -112,20 +112,19 @@ Open http://localhost:3000
 
 Rotate your Ollama API key if it was ever shared in chat or committed by mistake.
 
-## Roadmap
+## Learning architecture
 
-The cognitive architecture has a deliberately finite roadmap. Steps 1–6 and the integration hardening Step 6.5 are implemented; later entries are not current capabilities.
+Every completed or failed cognitive run is recorded as a redacted immutable
+experience in `BRAIN_LEARNING_DB` (default `data/brain_learning.sqlite3`).
+Only claims backed by Step 7 evidence verification are promoted to reusable
+knowledge. Future planning receives retrieved knowledge as typed, untrusted
+reference data with provenance and confidence; it never becomes authority or
+an executable command. See [docs/BRAIN_LEARNING.md](docs/BRAIN_LEARNING.md).
 
-1. Executive Cognitive Layer
-2. Cognitive Runtime
-3. Working Memory & Cognitive Context
-4. Cognitive Planner
-5. Action Executor & Capability Boundary
-6. Execution Observation & Result Interpretation
-6.5. Conversation-Centered UI & Integration Hardening — including the bounded, capability-backed conversation bridge
-7. Verification & Evidence
-8. Bounded Execution Coordinator
-9. Persistent Memory
-10. Cognitive State & Adaptation
-11. Deliberation & Replanning
-12. Bounded Cognitive Loop
+## Public-web research
+
+Ultron can conduct bounded, capability-authorized public-web research with
+source/claim/evidence separation, corroboration, contradiction retention, and
+freshness-aware world knowledge. The deployment and safety model is documented
+in [docs/BRAIN_RESEARCH.md](docs/BRAIN_RESEARCH.md). Set
+`BRAIN_RESEARCH_API_TOKEN` before exposing the research control API.

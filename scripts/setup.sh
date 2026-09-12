@@ -30,9 +30,9 @@ source .venv/bin/activate
 pip install -e . >/dev/null
 
 echo "==> Embedded voice engine (vendored Voicebox)"
-if [ ! -d vendor/voicebox/.git ]; then
+if [ ! -d "$ROOT/backend/vendor/voicebox/.git" ]; then
   echo "Cloning Voicebox source..."
-  git clone --depth 1 https://github.com/jamiepine/voicebox.git vendor/voicebox
+  git clone --depth 1 https://github.com/jamiepine/voicebox.git "$ROOT/backend/vendor/voicebox"
 fi
 "$ROOT/scripts/setup-voicebox-engine.sh"
 

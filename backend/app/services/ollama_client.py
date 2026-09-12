@@ -4,15 +4,13 @@ import json
 import re
 from typing import Any
 
-import httpx
+from app.local_intelligence import LocalModelError, get_local_orchestrator
 
-from app.config import settings
-
-_JSON_FENCE = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
+_JSON_FENCE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL | re.IGNORECASE)
 
 
 class OllamaError(Exception):
-    pass
+    """Compatibility error name for retired callers; no Ollama request occurs."""
 
 
 async def refine_transcript(text: str) -> str:
@@ -25,53 +23,37 @@ async def refine_transcript(text: str) -> str:
     )
 
 
-def _chat_url(host: str) -> str:
-    return f"{host.rstrip('/')}/api/chat"
-
-
-def _auth_headers(api_key: str | None) -> dict[str, str]:
-    if not api_key:
-        return {}
-    return {"Authorization": f"Bearer {api_key}"}
-
-
 async def chat_response(
     *,
     user_message: str,
     system_prompt: str = "You are a helpful assistant. Keep replies concise and conversational.",
     history: list[dict[str, str]] | None = None,
 ) -> str:
-    if not settings.ollama_api_key:
-        raise OllamaError("OLLAMA_API_KEY is not configured")
-
-    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
-    if history:
-        messages.extend(history)
-    messages.append({"role": "user", "content": user_message})
-
-    payload = {
-        "model": settings.ollama_model,
-        "messages": messages,
-        "stream": False,
-    }
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            _chat_url(settings.ollama_host),
-            headers=_auth_headers(settings.ollama_api_key),
-            json=payload,
+    """Retired import path backed by the active local runtime only."""
+    try:
+        answer, _ = await get_local_orchestrator().generate(
+            system_prompt=system_prompt, user_message=user_message, history=history,
         )
-        if response.status_code >= 400:
-            raise OllamaError(response.text)
-        data = response.json()
-        message = data.get("message", {})
-        return message.get("content", "").strip() or user_message
+    except LocalModelError as exc:
+        raise OllamaError(f"LOCAL MODEL UNAVAILABLE: {exc}") from exc
+    return answer
 
 
 def parse_structured_content(content: Any) -> dict[str, Any]:
-    """Parse model content as a JSON object. Does not classify from prose."""
+    """Parse a provider's JSON-object representation without changing meaning.
+
+    Some compatible endpoints return the object directly while others wrap it
+    in a ``content``/``response`` field or place JSON after a short preamble.
+    This function only unwraps or extracts a JSON object; typing, enum values,
+    required fields, and unknown fields are still rejected by Pydantic at the
+    Executive boundary.
+    """
 
     if isinstance(content, dict):
+        for key in ("content", "response"):
+            wrapped = content.get(key)
+            if isinstance(wrapped, (str, dict)):
+                return parse_structured_content(wrapped)
         return content
     if not isinstance(content, str):
         raise OllamaError("Structured model output was not JSON")
@@ -84,9 +66,23 @@ def parse_structured_content(content: Any) -> dict[str, Any]:
         parsed = json.loads(text)
     except json.JSONDecodeError:
         fenced = _JSON_FENCE.search(text)
-        if not fenced:
-            raise OllamaError("Structured model output was not valid JSON") from None
-        parsed = json.loads(fenced.group(1))
+        if fenced:
+            try:
+                parsed = json.loads(fenced.group(1))
+            except json.JSONDecodeError as exc:
+                raise OllamaError("Structured model output was not valid JSON") from exc
+        else:
+            # JSONDecoder.raw_decode accepts a provider's harmless prose
+            # preamble while refusing trailing prose or a non-object value.
+            brace = text.find("{")
+            if brace < 0:
+                raise OllamaError("Structured model output was not valid JSON") from None
+            try:
+                parsed, end = json.JSONDecoder().raw_decode(text[brace:])
+            except json.JSONDecodeError as exc:
+                raise OllamaError("Structured model output was not valid JSON") from exc
+            if text[brace + end :].strip():
+                raise OllamaError("Structured model output included non-JSON trailing content")
 
     if not isinstance(parsed, dict):
         raise OllamaError("Structured model output was not a JSON object")
@@ -104,44 +100,15 @@ async def chat_structured(
     timeout: float = 30.0,
     api_key: str | None = None,
 ) -> dict[str, Any]:
-    """Request JSON matching json_schema via Ollama's native format parameter."""
-
-    selected_model = model or settings.ollama_model
-    selected_host = host or settings.ollama_host
-    key = settings.ollama_api_key if api_key is None else api_key
-
-    messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
-    if history:
-        messages.extend(history)
-    messages.append({"role": "user", "content": user_message})
-
-    payload: dict[str, Any] = {
-        "model": selected_model,
-        "messages": messages,
-        "stream": False,
-        "format": json_schema,
-        "options": {"temperature": 0},
-    }
-
+    """Retired import path for structured generation, retained without HTTP IO."""
+    del model, host, timeout, api_key
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                _chat_url(selected_host),
-                headers=_auth_headers(key or None),
-                json=payload,
-            )
-    except httpx.TimeoutException as exc:
-        raise OllamaError("Structured model call timed out") from exc
-    except httpx.HTTPError as exc:
-        raise OllamaError("Structured model call failed") from exc
-
-    if response.status_code >= 400:
-        raise OllamaError("Structured model call returned an error")
-
-    try:
-        data = response.json()
-    except json.JSONDecodeError as exc:
-        raise OllamaError("Structured model HTTP body was not JSON") from exc
-
-    message = data.get("message", {})
-    return parse_structured_content(message.get("content", ""))
+        content, _ = await get_local_orchestrator().generate(
+            system_prompt=system_prompt + "\nReturn JSON only for this schema:\n" + json.dumps(json_schema),
+            user_message=user_message,
+            history=history,
+            temperature=0.0,
+        )
+    except LocalModelError as exc:
+        raise OllamaError(f"LOCAL MODEL UNAVAILABLE: {exc}") from exc
+    return parse_structured_content(content)

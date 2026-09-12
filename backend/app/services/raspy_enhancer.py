@@ -11,7 +11,7 @@ _RASP_PERCENTILE = 58.0
 
 
 def _vendor_root() -> Path:
-    return Path(__file__).resolve().parents[3] / "vendor" / "voicebox"
+    return Path(__file__).resolve().parents[2] / "vendor" / "voicebox"
 
 
 def _apply_chorus(

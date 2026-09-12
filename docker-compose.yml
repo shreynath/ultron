@@ -2,7 +2,7 @@
 # On Apple Silicon Mac, prefer the native Voicebox app for MLX acceleration.
 #
 # Usage:
-#   git clone https://github.com/jamiepine/voicebox.git vendor/voicebox
+#   git clone https://github.com/jamiepine/voicebox.git backend/vendor/voicebox
 #   docker compose up voicebox
 #
 # Or point VOICEBOX_API_URL in .env to your running Voicebox instance.
@@ -11,7 +11,7 @@ services:
   voicebox:
     image: voicebox-local
     build:
-      context: ./vendor/voicebox
+      context: ./backend/vendor/voicebox
     container_name: ultron-voicebox
     restart: unless-stopped
     ports:

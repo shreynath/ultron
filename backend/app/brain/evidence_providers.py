@@ -7,6 +7,8 @@ capabilities, not verification policy.
 from __future__ import annotations
 
 from app.brain.reference_capability import ReferenceEvidenceProvider
+from app.brain.document_analysis import DocumentAnalysisEvidenceProvider
+from app.brain.research_evidence import ResearchEvidenceProvider
 from app.brain.verification import EvidenceProviderRegistry, WeatherEvidenceProvider
 
 
@@ -18,4 +20,6 @@ def create_application_evidence_providers() -> EvidenceProviderRegistry:
         ReferenceEvidenceProvider("pi_prefix"),
         ReferenceEvidenceProvider("positional_lookup"),
         ReferenceEvidenceProvider("science_reference"),
+        DocumentAnalysisEvidenceProvider(),
+        ResearchEvidenceProvider(),
     ))

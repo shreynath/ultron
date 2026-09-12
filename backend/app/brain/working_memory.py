@@ -15,6 +15,8 @@ from app.brain.errors import CognitiveRuntimeError
 from app.brain.actions import ActionStatus
 from app.brain.observation import ExecutionObservation
 from app.brain.schemas import TaskAssessment
+from app.brain.task_contract import TaskContract, build_task_contract
+from app.brain.learning import RetrievalResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,7 @@ MAX_USER_INPUT_CHARS = 10_000
 MAX_HISTORY_CONTENT_CHARS = 10_000
 MAX_ARTIFACT_CONTENT_CHARS = 8_000
 MAX_ARTIFACT_LABEL_CHARS = 100
+MAX_RETRIEVED_KNOWLEDGE = 8
 
 
 class HistoryMessage(BaseModel):
@@ -74,6 +77,7 @@ class CognitiveTask(BaseModel):
     task_id: UUID = Field(default_factory=uuid4)
     objective: str = Field(min_length=1, max_length=400)
     assessment: TaskAssessment
+    contract: TaskContract
 
 
 class WorkingMemory(BaseModel):
@@ -98,6 +102,17 @@ class WorkingMemory(BaseModel):
         default_factory=list,
         max_length=MAX_ACTION_EXECUTIONS,
     )
+    # Retrieval is a bounded data channel for the current task. It is never
+    # authority, instruction, or a substitute for a verifier.
+    retrieved_knowledge: list[RetrievalResult] = Field(
+        default_factory=list,
+        max_length=MAX_RETRIEVED_KNOWLEDGE,
+    )
+
+    def add_retrieved_knowledge(self, items: list[RetrievalResult] | tuple[RetrievalResult, ...]) -> None:
+        if not all(isinstance(item, RetrievalResult) for item in items):
+            raise CognitiveRuntimeError("WorkingMemory requires typed retrieval results")
+        self.retrieved_knowledge = list(items)[-MAX_RETRIEVED_KNOWLEDGE:]
 
     def add_observation(self, observation: ExecutionObservation | Observation) -> None:
         """Append an explicit observation, retaining only the newest items."""
@@ -183,6 +198,7 @@ def create_cognitive_context(
         task=CognitiveTask(
             objective=assessment.user_goal,
             assessment=assessment,
+            contract=build_task_contract(user_input=user_input, assessment=assessment),
         ),
         working_memory=WorkingMemory(
             user_input=user_input,

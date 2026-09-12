@@ -12,7 +12,20 @@ fi
 
 VOICE_ENGINE_MODE="${VOICE_ENGINE_MODE:-embedded}"
 VOICE_PORT="${ULTRON_VOICEBOX_PORT:-17493}"
-ENGINE_VENV="$ROOT/vendor/voicebox/backend/venv"
+ENGINE_VENV="$ROOT/backend/vendor/voicebox/backend/venv"
+PERFORMANCE_PROFILE="${ULTRON_PERFORMANCE_PROFILE:-maximum}"
+
+if [ "$PERFORMANCE_PROFILE" = "maximum" ]; then
+  CPU_THREADS="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+  export OMP_NUM_THREADS="${OMP_NUM_THREADS:-$CPU_THREADS}"
+  export VECLIB_MAXIMUM_THREADS="${VECLIB_MAXIMUM_THREADS:-$CPU_THREADS}"
+  export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-$CPU_THREADS}"
+  export NUMEXPR_MAX_THREADS="${NUMEXPR_MAX_THREADS:-$CPU_THREADS}"
+  export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-true}"
+  BACKEND_WORKERS="${ULTRON_BACKEND_WORKERS:-$CPU_THREADS}"
+else
+  BACKEND_WORKERS="${ULTRON_BACKEND_WORKERS:-1}"
+fi
 
 free_port() {
   local port="$1"
@@ -79,7 +92,12 @@ fi
 
 cd "$ROOT/backend"
 source .venv/bin/activate
-uvicorn app.main:app --reload --port 8000 &
+if [ "$PERFORMANCE_PROFILE" = "maximum" ]; then
+  echo "Performance profile: maximum (CPU threads: $OMP_NUM_THREADS, backend workers: $BACKEND_WORKERS)"
+  uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers "$BACKEND_WORKERS" &
+else
+  uvicorn app.main:app --reload --port 8000 &
+fi
 BACKEND_PID=$!
 
 cd "$ROOT/frontend"

@@ -12,6 +12,7 @@ from app.brain.runtime import (
     ExecutionStatus,
     required_capabilities,
     route_assessment,
+    require_live_research,
 )
 from app.brain.schemas import (
     Complexity,
@@ -109,6 +110,15 @@ def test_direct_route_precedence_without_capability_requirements() -> None:
 def test_explicit_capability_requirement_precedes_direct_response() -> None:
     assessment = _assessment(direct=True, verification=True)
     assert route_assessment(assessment) is ExecutionRoute.COGNITIVE_EXECUTION_REQUIRED
+
+
+def test_explicit_current_information_overrides_an_underclassified_direct_route() -> None:
+    adjusted = require_live_research(_assessment(task_type=TaskType.UNKNOWN), "Who is the current CEO of NVIDIA?")
+
+    assert adjusted.task_type is TaskType.RETRIEVAL
+    assert adjusted.requires_tools is True
+    assert adjusted.requires_verification is True
+    assert route_assessment(adjusted) is ExecutionRoute.COGNITIVE_EXECUTION_REQUIRED
 
 
 @pytest.mark.anyio

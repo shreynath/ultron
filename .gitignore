@@ -19,9 +19,9 @@ out/
 dist/
 *.tsbuildinfo
 
-vendor/voicebox/backend/venv/
-vendor/voicebox/backend/data/
-vendor/voicebox/**/__pycache__/
+backend/vendor/voicebox/backend/venv/
+backend/vendor/voicebox/backend/data/
+backend/vendor/voicebox/**/__pycache__/
 data/
 backend/data/
 *.wav

@@ -1,13 +1,13 @@
 # Voicebox Setup (macOS Apple Silicon)
 
-Ultron uses [Voicebox](https://voicebox.sh) as its local voice engine. On your Mac, run the **native app** — not Docker — for MLX/Metal acceleration.
+Ultron runs its vendored [Voicebox](https://voicebox.sh) engine from
+`backend/vendor/voicebox`; a separate Voicebox desktop app is not required.
 
 ## Install
 
-1. Download Voicebox for Apple Silicon: https://voicebox.sh/download/mac-arm
-2. Open the DMG and drag Voicebox to Applications
-3. Launch Voicebox from Applications
-4. Grant microphone/accessibility permissions if prompted
+1. Run `./scripts/setup.sh` from the repository root.
+2. Run `./scripts/dev.sh`; it starts the embedded engine on port 17493.
+3. The first TTS operation downloads the selected model.
 
 ## Verify
 
@@ -49,7 +49,7 @@ Ultron uses Voicebox's Whisper integration for transcription. Default model: `wh
 
 | Issue | Fix |
 |---|---|
-| `Voicebox: NOT RUNNING` | Launch the Voicebox app |
+| `Voicebox: NOT RUNNING` | Run `./scripts/setup-voicebox-engine.sh`, then `./scripts/dev.sh` |
 | Clone fails with 502 | Ensure Voicebox API is reachable at port 17493 |
 | Slow first generation | Normal — model is downloading |
 | Poor clone quality | Use clearer source audio; try a different engine |

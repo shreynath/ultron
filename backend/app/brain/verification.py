@@ -68,6 +68,10 @@ class Claim(BaseModel):
     importance: ClaimImportance = ClaimImportance.PRIMARY
     claim_type: ClaimType = ClaimType.FACT
     expected_value: str | None = Field(default=None, max_length=400)
+    # Application evidence providers may provide a stable subject key. It lets
+    # newer evidence contradict a prior value without treating raw prose as an
+    # identity. Model output cannot set a learned-knowledge state.
+    knowledge_key: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class Evidence(BaseModel):
@@ -158,8 +162,19 @@ class WeatherEvidenceProvider:
         output = action_result.output
         assert isinstance(output, dict)
         return (
-            Claim(text=f"Current temperature in {output['location']}: {float(output['temperature_f']):.0f}°F", claim_type=ClaimType.NUMERIC_VALUE, expected_value=str(round(float(output['temperature_f'])))),
-            Claim(text=f"Current condition in {output['location']}: {output['condition']}", importance=ClaimImportance.SECONDARY, claim_type=ClaimType.CATEGORICAL, expected_value=str(output['condition']).lower()),
+            Claim(
+                text=f"Current temperature in {output['location']}: {float(output['temperature_f']):.0f}°F",
+                claim_type=ClaimType.NUMERIC_VALUE,
+                expected_value=str(round(float(output["temperature_f"]))),
+                knowledge_key=f"weather.temperature:{str(output['location']).lower()}",
+            ),
+            Claim(
+                text=f"Current condition in {output['location']}: {output['condition']}",
+                importance=ClaimImportance.SECONDARY,
+                claim_type=ClaimType.CATEGORICAL,
+                expected_value=str(output["condition"]).lower(),
+                knowledge_key=f"weather.condition:{str(output['location']).lower()}",
+            ),
         )
 
     def fallback_answer(self, action_result: ActionResult) -> str:

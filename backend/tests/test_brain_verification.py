@@ -166,11 +166,12 @@ def _transport() -> httpx.MockTransport:
 
 
 @pytest.mark.anyio
-async def test_runtime_replaces_a_contradicted_model_weather_answer_with_evidence() -> None:
+async def test_runtime_does_not_allow_a_model_to_replace_weather_action_evidence() -> None:
     weather = WeatherCapability(transport=_transport(), timeout=0.2)
     registry = ConversationCapabilityRegistry((weather,))
+    generator = AsyncMock(return_value="It is 91°F and raining in College Station.")
     runtime = CognitiveRuntime(
-        response_generator=AsyncMock(return_value="It is 91°F and raining in College Station."),
+        response_generator=generator,
         conversation_bridge=ConversationCapabilityBridge(
             registry=registry,
             executor=ActionExecutor(registry=registry.executor_registry, allowed_capabilities=registry.names(), timeout=0.5),
@@ -183,14 +184,15 @@ async def test_runtime_replaces_a_contradicted_model_weather_answer_with_evidenc
 
     assert execution.status is ExecutionStatus.COMPLETED
     assert execution.verification is not None
-    assert execution.verification.status is VerificationStatus.CONTRADICTED
-    assert execution.response_generation_status == "corrected_from_evidence"
+    assert execution.verification.status is VerificationStatus.VERIFIED
+    assert execution.response_generation_status == "grounded_capability"
+    generator.assert_not_awaited()
     assert "84°F" in execution.answer
     assert "91°F" not in execution.answer
     assert execution.action_status == ActionStatus.COMPLETED.value
     assert execution.observation_outcome == "success"
-    assert execution.verification.contradicting_evidence[0].source_identifier == "Open-Meteo:weather.current_weather"
-    assert execution.verification.contradicting_evidence[0].retrieved_at.tzinfo is not None
+    assert execution.verification.supporting_evidence[0].source_identifier == "Open-Meteo:weather.current_weather"
+    assert execution.verification.supporting_evidence[0].retrieved_at.tzinfo is not None
 
 
 @pytest.mark.anyio
@@ -261,8 +263,9 @@ async def test_pi_reference_runs_through_the_complete_evidence_runtime_path() ->
     evidence_json = execution.verification.model_dump_json()
     assert "dispatch-token-123" not in evidence_json
     assert "control-token-456" not in evidence_json
-    # The only model call is optional response wording; verification itself is deterministic.
-    assert response_generator.await_count == 1
+    # Capability prose is rendered from the action result; the model cannot
+    # introduce an unsupported computation or retrieval claim.
+    assert response_generator.await_count == 0
 
 
 @pytest.mark.anyio

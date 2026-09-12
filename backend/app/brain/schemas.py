@@ -48,6 +48,9 @@ class ExecutiveOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task_type: TaskType
+    # The primary type remains the routing key. Additional types retain a
+    # hybrid request's shape without allowing model prose to select actions.
+    task_types: tuple[TaskType, ...] = Field(default=(), max_length=6)
     complexity: Complexity
     requires_tools: bool
     requires_memory: bool
@@ -93,6 +96,7 @@ def executive_json_schema() -> dict:
         "additionalProperties": False,
         "properties": {
             "task_type": {"type": "string", "enum": [item.value for item in TaskType]},
+            "task_types": {"type": "array", "items": {"type": "string", "enum": [item.value for item in TaskType]}, "maxItems": 6},
             "complexity": {"type": "string", "enum": [item.value for item in Complexity]},
             "requires_tools": {"type": "boolean"},
             "requires_memory": {"type": "boolean"},
@@ -109,6 +113,7 @@ def executive_json_schema() -> dict:
         },
         "required": [
             "task_type",
+            "task_types",
             "complexity",
             "requires_tools",
             "requires_memory",

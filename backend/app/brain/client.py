@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Protocol
 
-from app.config import settings
-from app.services.ollama_client import chat_structured
+from app.local_intelligence import get_local_orchestrator
+from app.services.ollama_client import parse_structured_content
 
 
 class StructuredModelClient(Protocol):
@@ -19,12 +20,17 @@ class StructuredModelClient(Protocol):
         timeout: float,
         model: str,
         host: str,
-    ) -> dict[str, Any]:
+    ) -> Any:
         ...
 
 
-class OllamaStructuredClient:
-    """Adapter over the shared Ollama HTTP helper."""
+class LocalStructuredClient:
+    """Structured generation through the active local model only.
+
+    ``model`` and ``host`` remain in the boundary signature for the frozen
+    Executive/Planner interfaces.  They are deliberately not treated as an
+    endpoint or a provider selection mechanism.
+    """
 
     async def generate_structured(
         self,
@@ -36,14 +42,22 @@ class OllamaStructuredClient:
         timeout: float,
         model: str,
         host: str,
-    ) -> dict[str, Any]:
-        return await chat_structured(
-            system_prompt=system_prompt,
+    ) -> Any:
+        del model, host, timeout
+        schema_instruction = (
+            "\n\nReturn exactly one JSON object matching this schema. Do not use markdown.\n"
+            + json.dumps(json_schema, separators=(",", ":"))
+        )
+        content, _ = await get_local_orchestrator().generate(
+            system_prompt=system_prompt + schema_instruction,
             user_message=user_message,
             history=history,
-            json_schema=json_schema,
-            timeout=timeout,
-            model=model,
-            host=host,
-            api_key=settings.ollama_api_key or None,
+            temperature=0.0,
         )
+        return parse_structured_content(content)
+
+
+# Compatibility name retained for callers and focused legacy tests.  It is an
+# alias (not an Ollama adapter), so the default cognitive path has no network
+# model dependency.
+OllamaStructuredClient = LocalStructuredClient

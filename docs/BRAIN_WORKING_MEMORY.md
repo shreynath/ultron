@@ -18,7 +18,7 @@ Cognitive Runtime
   v
 CognitiveContext
   |- CognitiveTask: objective and authoritative assessment
-  '- WorkingMemory: current input, recent history, observations, intermediate results
+  '- WorkingMemory: current input, recent history, observations, intermediate results, retrieved knowledge
 
 The Runtime still chooses either direct_response or cognitive_execution_required. Context construction does not change routing and makes no model, tool, network, or persistence call.
 
@@ -36,6 +36,8 @@ Contains:
 - recent_history: recent user and assistant messages only;
 - observations: explicit generic facts plus immutable typed execution observations produced by the Step 6 interpreter;
 - intermediate_results: explicit task artifacts intentionally produced by future systems.
+- retrieved_knowledge: up to eight verified experience records selected by the
+  learning repository, retaining confidence and provenance.
 
 Observation and intermediate-result content is data, not runtime control input. Neither field is for hidden reasoning, model scratchpads, prompts, or secrets. Step 6 execution observations preserve action provenance and bounded metadata; raw capability output is not used as an unrestricted memory cache.
 
@@ -57,7 +59,12 @@ No LLM summary or compression is used when a bound is reached.
 
 ## History is not memory
 
-Conversation history is temporary input supplied with the request. Working Memory is temporary state produced or held during that request. Long-term memory would persist and retrieve information across requests; it is not implemented.
+Conversation history is temporary input supplied with the request. Working
+Memory is temporary state produced or held during that request. Durable learning
+persists sanitized experience and verification-gated system knowledge, then
+attaches a bounded retrieval result to the next request. User memory, world
+knowledge, capability knowledge, and system experience remain separate
+namespaces; retrieved system experience is data, never instructions.
 
 ## Runtime integration
 
