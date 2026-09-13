@@ -249,7 +249,10 @@ def _quality_rejection(text: str, config: CorpusConfig) -> RejectionReason | Non
     if characters and max(Counter(characters).values()) / len(characters) > 0.70:
         return RejectionReason.HIGH_REPETITION
     words = _WORDS.findall(text)
-    if len(words) < 3 or len({word.lower() for word in words}) / len(words) < 0.18:
+    # Vocabulary type/token ratio naturally falls as coherent documents become
+    # longer. Apply the anti-template threshold only to short material; large
+    # prose still has independent repetition and character-integrity guards.
+    if len(words) < 3 or (len(words) < 2_000 and len({word.lower() for word in words}) / len(words) < 0.18):
         return RejectionReason.LOW_QUALITY
     # Technical standards and documentation can legitimately contain many
     # references.  Treat links as a spam signal only when dense in a short

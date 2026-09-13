@@ -71,6 +71,13 @@ from app.foundation.phase_l_diagnostics import (
     synthetic_overfit,
     tokenizer_audit,
 )
+from app.foundation.phase_m import (
+    audit_phase_m_release,
+    build_phase_m_release,
+    phase_m_rung_plan,
+    phase_m_source_inventory,
+    phase_m_status,
+)
 from app.foundation.runs import TrainingRunRegistry
 from app.foundation.scaling import (
     ScalingConfig,
@@ -479,6 +486,39 @@ def command_phase_l_acquire(args: argparse.Namespace) -> None:
     emit(result)
 
 
+def command_phase_m_build(args: argparse.Namespace) -> None:
+    """Publish and audit a Phase M corpus from registered cache entries only."""
+    emit(build_phase_m_release(
+        Path(args.root), release_id=args.release_id, tokenizer=UltronTokenizer(Path(args.tokenizer)),
+        target_tokens=args.target_tokens, context_length=args.context,
+    ))
+
+
+def command_phase_m_audit(args: argparse.Namespace) -> None:
+    emit(audit_phase_m_release(
+        Path(args.release_dir), Path(args.tokenized_dir), UltronTokenizer(Path(args.tokenizer)),
+    ))
+
+
+def command_phase_m_status(args: argparse.Namespace) -> None:
+    emit(phase_m_status(Path(args.root)))
+
+
+def command_phase_m_inventory(args: argparse.Namespace) -> None:
+    emit(phase_m_source_inventory(Path(args.root), UltronTokenizer(Path(args.tokenizer))))
+
+
+def command_phase_m_rungs(args: argparse.Namespace) -> None:
+    development = read_json(str(Path(args.development_tokenized_dir) / "manifest.json"))
+    formal = read_json(str(Path(args.formal_tokenized_dir) / "manifest.json")) if args.formal_tokenized_dir else None
+    emit(phase_m_rung_plan(
+        development_release_id=development["release_id"], development_corpus_tokens=development["token_count"],
+        formal_release_id=formal["release_id"] if formal else None,
+        formal_corpus_tokens=formal["token_count"] if formal else None,
+        parent_checkpoint=args.parent_checkpoint,
+    ))
+
+
 def command_diagnostics(args: argparse.Namespace) -> None:
     emit(analyze_learning_curve(Path(args.curve)))
 
@@ -647,6 +687,29 @@ def parser() -> argparse.ArgumentParser:
     phase_l_acquire.add_argument("--manifest", required=True)
     phase_l_acquire.add_argument("--max-retries", type=int, default=2)
     phase_l_acquire.set_defaults(func=command_phase_l_acquire)
+    phase_m_build = commands.add_parser("phase-m-build", help="Build and fully audit an immutable registered-source Phase M release.")
+    phase_m_build.add_argument("--root", required=True)
+    phase_m_build.add_argument("--release-id", required=True)
+    phase_m_build.add_argument("--tokenizer", required=True)
+    phase_m_build.add_argument("--target-tokens", type=int, choices=(5_000_000, 10_000_000), required=True)
+    phase_m_build.add_argument("--context", type=int, default=512)
+    phase_m_build.set_defaults(func=command_phase_m_build)
+    phase_m_audit = commands.add_parser("phase-m-audit", help="Audit an immutable Phase M release and packed shards.")
+    for name in ("release_dir", "tokenized_dir", "tokenizer"):
+        phase_m_audit.add_argument(f"--{name.replace('_', '-')}", required=True)
+    phase_m_audit.set_defaults(func=command_phase_m_audit)
+    phase_m_status_parser = commands.add_parser("phase-m-status", help="Report Phase M release and scaling readiness without changing evidence.")
+    phase_m_status_parser.add_argument("--root", required=True)
+    phase_m_status_parser.set_defaults(func=command_phase_m_status)
+    phase_m_inventory = commands.add_parser("phase-m-inventory", help="Measure source-pool scale and emit every inclusion/exclusion decision.")
+    phase_m_inventory.add_argument("--root", required=True)
+    phase_m_inventory.add_argument("--tokenizer", required=True)
+    phase_m_inventory.set_defaults(func=command_phase_m_inventory)
+    phase_m_rungs = commands.add_parser("phase-m-rungs", help="Write the controlled 1M/5M/10M exposure ladder without executing it.")
+    phase_m_rungs.add_argument("--development-tokenized-dir", required=True)
+    phase_m_rungs.add_argument("--formal-tokenized-dir")
+    phase_m_rungs.add_argument("--parent-checkpoint")
+    phase_m_rungs.set_defaults(func=command_phase_m_rungs)
     phase_l_sustained = commands.add_parser("phase-l-sustained")
     for name in ("root", "model_config"):
         phase_l_sustained.add_argument(f"--{name.replace('_', '-')}", required=True)

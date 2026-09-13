@@ -149,13 +149,18 @@ def _ngram_metrics(ids: list[int], n: int) -> NgramRepetition:
     return NgramRepetition(n=n, total=total, unique=unique, entropy_bits=round(_entropy(grams), 6), repetition_rate=round(1.0 - unique / total, 6) if total else 0.0)
 
 
-def _longest_shared_span(sequences: list[list[int]], *, limit: int = 64) -> int:
+def _longest_shared_span(sequences: list[list[int]], *, limit: int = 64, maximum_windows_per_document: int = 512) -> int:
     """Conservative cross-document overlap measurement, bounded for local use."""
     seen: dict[tuple[int, ...], int] = {}
     longest = 0
     for document_index, ids in enumerate(sequences):
         for width in range(1, min(limit, len(ids)) + 1):
-            for offset in range(len(ids) - width + 1):
+            window_count = len(ids) - width + 1
+            # Long books must not turn a diagnostic into a quadratic-scale
+            # release blocker. Sample offsets uniformly and deterministically;
+            # exact/normalized hashes and fingerprints remain exhaustive.
+            stride = max(1, math.ceil(window_count / maximum_windows_per_document))
+            for offset in range(0, window_count, stride):
                 span = tuple(ids[offset:offset + width])
                 previous = seen.get(span)
                 if previous is not None and previous != document_index:
